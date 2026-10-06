@@ -12,33 +12,36 @@
 #
 # SPDX-License-Identifier: EPL-2.0
 #*******************************************************************************
+APPROVED_FILE="$(dirname "$0")/../config/spire/approved-workloads.list"
+
+#  Helper to access spire server functions
+spire_server() {
+  # -T + </dev/null: keep docker exec from consuming the loop's stdin
+  docker compose exec -T spire-server \
+    /opt/spire/bin/spire-server "$@" \
+      -socketPath /run/spire/server/private/api.sock </dev/null
+}
+
+#  Remove existing registrations
+#  For the purpose of demo/blueprint this is fine
+spire_server entry show | awk '/^Entry ID/ {print $4}' | while read -r id; do
+  echo "deleting entry $id"
+  spire_server entry delete -entryID "$id" >/dev/null
+done
 
 #  Registers the workloads with the SPIRE server
+while read -r -u 3 spiffe_id digest _ || [[ -n "$spiffe_id" ]]; do
+  [[ -z "$spiffe_id" || "$spiffe_id" == \#* ]] && continue
 
-# Backend workloads
+  zone=$(echo "$spiffe_id" | cut -d/ -f4)
+  case "$zone" in
+    backend) agent=spire-agent-backend ;;
+    vehicle) agent=spire-agent-vehicle ;;
+    *) echo "unknown zone '$zone' in $spiffe_id" >&2; exit 1 ;;
+  esac
 
-docker compose exec -T spire-server \
-  /opt/spire/bin/spire-server entry create \
-    -socketPath /run/spire/server/private/api.sock \
-    -parentID spiffe://sdv.eclipse.org/spire/agent/x509pop/spire-agent-backend \
-    -spiffeID spiffe://sdv.eclipse.org/backend/fms \
-    -selector docker:image_id:ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/fms:latest \
-    -selector docker:env:UP_LOCAL_ADDRESS=up://backend/103AA/1/0
-
-# In-vehicle workloads
-
-docker compose exec -T spire-server \
-  /opt/spire/bin/spire-server entry create \
-    -socketPath /run/spire/server/private/api.sock \
-    -parentID spiffe://sdv.eclipse.org/spire/agent/x509pop/spire-agent-vehicle \
-    -spiffeID spiffe://sdv.eclipse.org/vehicle/properties \
-    -selector docker:image_id:ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/vehicle-properties:latest \
-    -selector docker:env:UP_LOCAL_ADDRESS=up://vehicle/10302/1/0
-
-docker compose exec -T spire-server \
-  /opt/spire/bin/spire-server entry create \
-    -socketPath /run/spire/server/private/api.sock \
-    -parentID spiffe://sdv.eclipse.org/spire/agent/x509pop/spire-agent-vehicle \
-    -spiffeID spiffe://sdv.eclipse.org/vehicle/powertrain-mode-controller \
-    -selector docker:image_id:ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/powertrain-mode-controller:latest \
-    -selector docker:env:UP_LOCAL_ADDRESS=up://vehicle/10301/1/0
+  spire_server entry create \
+    -parentID "spiffe://sdv.eclipse.org/spire/agent/x509pop/${agent}" \
+    -spiffeID "$spiffe_id" \
+    -selector "docker:image_config_digest:${digest}"
+done 3< "$APPROVED_FILE"
