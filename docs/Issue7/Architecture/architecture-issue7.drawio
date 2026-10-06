@@ -1,0 +1,472 @@
+<mxfile host="Electron" agent="copilot" pages="3">
+  <diagram name="OLD — main (static JWT)" id="arch-old">
+    <mxGraphModel dx="922" dy="507" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1350" pageHeight="1180" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="frameBackend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontSize=13;fontStyle=1;" value="BACKEND / CLOUD&#xa;docker network: backend" vertex="1">
+          <mxGeometry height="190" width="900" x="40" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="frameBus" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontSize=12;fontStyle=1;" value="MESSAGE BUS&#xa;bridges: backend + vehicle-uprotocol" vertex="1">
+          <mxGeometry height="140" width="320" x="330" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="frameVehicle" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontSize=13;fontStyle=1;" value="&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;IN-VEHICLE&lt;br&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;docker networks: vehicle-uprotocol, vehicle-sovd" vertex="1">
+          <mxGeometry height="680" width="900" x="40" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="nUser" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="Operator / CI&#xa;curl · trigger_ecu_update.sh" vertex="1">
+          <mxGeometry height="70" width="170" x="40" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="nApi" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="symphony-api&#xa;Control Plane · REST :8082" vertex="1">
+          <mxGeometry height="70" width="180" x="330" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="nPortal" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="symphony-portal&#xa;Web UI :3000" vertex="1">
+          <mxGeometry height="70" width="150" x="590" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="nFms" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="fms&#xa;Fleet Management System&#xa;(uProtocol client)" vertex="1">
+          <mxGeometry height="70" width="150" x="770" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="nDozzle" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=10;" value="dozzle&#xa;Log viewer :8080" vertex="1">
+          <mxGeometry height="50" width="150" x="990" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="nDocker" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=10;" value="Docker Engine&#xa;/var/run/docker.sock" vertex="1">
+          <mxGeometry height="50" width="150" x="990" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="nMqtt" parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;fontStyle=1;" value="mosquitto&#xa;MQTT Broker :1883" vertex="1">
+          <mxGeometry height="70" width="200" x="390" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="nAgent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="symphony-agent&#xa;Target Agent" vertex="1">
+          <mxGeometry height="60" width="170" x="70" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="nUpdater" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="ecu-updater 0.1.0&#xa;uProtocol RPC service&#xa;(in-memory FW state)" vertex="1">
+          <mxGeometry height="70" width="180" x="370" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="nVprops" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="vehicle-properties&#xa;uProtocol ↔ Databroker bridge" vertex="1">
+          <mxGeometry height="60" width="200" x="720" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="nDbroker" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="databroker&#xa;Kuksa VAL · gRPC :55555" vertex="1">
+          <mxGeometry height="60" width="200" x="720" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="nPtc" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="powertrain-mode-controller&#xa;uProtocol RPC service" vertex="1">
+          <mxGeometry height="60" width="210" x="70" y="640" as="geometry" />
+        </mxCell>
+        <mxCell id="nCda" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="sovd-cda&#xa;upstream OpenSOVD test image&#xa;SOVD/HTTP :20002" vertex="1">
+          <mxGeometry height="70" width="210" x="70" y="780" as="geometry" />
+        </mxCell>
+        <mxCell id="nEcusim" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="ecu-sim&#xa;Simulated ECU (blueprint-ecu)&#xa;DoIP + Control HTTP :8181" vertex="1">
+          <mxGeometry height="70" width="210" x="70" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="nStaticJwt" parent="1" style="shape=note;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;spacing=8;" value="SECURITY (OLD)&#xa;• Static JWT hardcoded in docker-compose.yaml (SOVD_ACCESS_TOKEN env var)&#xa;• Same long-lived shared secret for every request to the CDA&#xa;• No workload identity, no authorization policy&#xa;• All services start with a single &#39;docker compose up&#39; (no profiles)" vertex="1">
+          <mxGeometry height="110" width="390" x="990" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="nSteps" parent="1" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fillColor=#ffffff;strokeColor=#333333;spacing=10;fontSize=11;" value="&lt;b&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;MESSAGE FLOW&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;&lt;font color=&quot;#d79b00&quot;&gt;OTA FIRMWARE UPDATE&lt;/font&gt;&lt;/b&gt;&lt;br&gt;A1  Operator → symphony-api : POST /users/auth (REST) → JWT&lt;br&gt;A2  Operator → symphony-api : POST /targets/registry/ecu-updater-target (Bearer, body=target.json)&lt;br&gt;A3  symphony-api → mosquitto : MQTT publish topic &#39;coa-request&#39; (desired state)&lt;br&gt;A4  mosquitto → symphony-agent : MQTT deliver &#39;coa-request&#39;&lt;br&gt;A5  symphony-agent → mosquitto : MQTT publish &#39;coa-response&#39; (ack)&lt;br&gt;A6  mosquitto → symphony-api : MQTT deliver &#39;coa-response&#39;&lt;br&gt;A7  symphony-agent → ecu-updater : uProtocol RPC GET up://ecu-updater/1A100/1/1 (poll ~15s)&lt;br&gt;A8  symphony-agent → ecu-updater : uProtocol RPC UPDATE .../1/2 (install FW) · DELETE .../1/3 (remove FW)&lt;br&gt;&lt;br&gt;&lt;b&gt;&lt;font color=&quot;#6c8ebf&quot;&gt;POWERTRAIN MODE CONFIG CHANGE&lt;/font&gt;&lt;/b&gt;&lt;br&gt;B1  fms → mosquitto : uProtocol RPC setCurrentMode(Economy|Performance) over MQTT5&lt;br&gt;B2  mosquitto → powertrain-mode-controller : deliver RPC request&lt;br&gt;B3  controller → sovd-cda : HTTP PUT .../data/powertrain_mode (Bearer = &lt;font color=&quot;#b85450&quot;&gt;&lt;b&gt;static hardcoded JWT&lt;/b&gt;&lt;/font&gt;)&lt;br&gt;B4  sovd-cda → ecu-sim : UDS WriteDataByIdentifier  2E 4E 66   over DoIP (ISO 13400)&lt;br&gt;B5  ecu-sim → sovd-cda : UDS positive response  6E 4E 66&lt;br&gt;B6  sovd-cda → controller : HTTP 200 OK&lt;br&gt;B7  controller → mosquitto : uProtocol RPC response over MQTT5&lt;br&gt;B8  mosquitto → fms : deliver RPC response (mode confirmed)&lt;br&gt;&lt;br&gt;&lt;b&gt;&lt;font color=&quot;#82b366&quot;&gt;VEHICLE SIGNALS&lt;/font&gt;&lt;/b&gt;&lt;br&gt;C1  vehicle-properties ↔ databroker : gRPC Kuksa VAL v1 (:55555) get/set VSS&lt;br&gt;C2  vehicle-properties ↔ mosquitto : uProtocol pub/sub (MQTT5) signal updates&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;M   dozzle → Docker Engine : stream logs   ·   portal → api : REST poll (UI)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="410" width="580" x="340" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="eA12" edge="1" parent="1" source="nUser" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#d79b00;fontColor=#d79b00;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="nApi" value="A1–A2  REST/HTTPS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eA36" edge="1" parent="1" source="nApi" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#d79b00;fontColor=#d79b00;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.4;exitY=1;entryX=0.27;entryY=0.014;entryDx=0;entryDy=0;entryPerimeter=0;" target="nMqtt" value="A3 / A6  MQTT coa-request/response">
+          <mxGeometry relative="1" x="0.0336" y="25" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eA45" edge="1" parent="1" source="nMqtt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#d79b00;fontColor=#d79b00;strokeWidth=2;startArrow=block;endArrow=block;exitX=0;exitY=0.25;entryX=0.5;entryY=0;exitDx=0;exitDy=0;" target="nAgent" value="A4 / A5  MQTT coa-request/response">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eA78" edge="1" parent="1" source="nAgent" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#d79b00;fontColor=#d79b00;strokeWidth=2;startArrow=block;endArrow=block;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="nUpdater" value="A7 / A8  uProtocol RPC (MQTT5)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eB18" edge="1" parent="1" source="nFms" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#6c8ebf;fontColor=#6c8ebf;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.5;exitY=1;entryX=0.85;entryY=0;" target="nMqtt" value="B1 / B8  uProtocol RPC (MQTT5)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eB27" edge="1" parent="1" source="nMqtt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#6c8ebf;fontColor=#6c8ebf;strokeWidth=2;startArrow=block;endArrow=block;exitX=0;exitY=0.5;entryX=0.7;entryY=1;" target="nPtc" value="B2 / B7  uProtocol RPC (MQTT5)">
+          <mxGeometry relative="1" x="-0.0157" y="-25" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eB36" edge="1" parent="1" source="nPtc" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#b85450;fontColor=#b85450;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="nCda" value="B3 / B6  HTTP SOVD · Bearer = STATIC JWT">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eB45" edge="1" parent="1" source="nCda" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#6c8ebf;fontColor=#6c8ebf;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="nEcusim" value="B4 / B5  UDS over DoIP (2E../6E..)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eC1" edge="1" parent="1" source="nVprops" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#82b366;fontColor=#82b366;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="nDbroker" value="C1  gRPC Kuksa VAL :55555">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eC2" edge="1" parent="1" source="nVprops" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#82b366;fontColor=#82b366;strokeWidth=2;startArrow=block;endArrow=block;exitX=0;exitY=0.25;entryX=0.755;entryY=0.971;entryDx=0;entryDy=0;entryPerimeter=0;" target="nMqtt" value="C2  uProtocol pub/sub (MQTT5)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eP1" edge="1" parent="1" source="nPortal" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=9;strokeColor=#999999;fontColor=#999999;exitX=0.5;exitY=1;entryX=0.85;entryY=1;" target="nApi" value="M  REST poll">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eM1" edge="1" parent="1" source="nDozzle" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=9;strokeColor=#999999;fontColor=#999999;exitX=1;exitY=0.5;entryX=0.5;entryY=0;" target="nDocker" value="M  Docker API logs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="NEW — PR #5 (SPIFFE/SPIRE + OPA)" id="arch-new">
+    <mxGraphModel dx="996" dy="549" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1180" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="frameBackend2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontSize=13;fontStyle=1;" value="BACKEND / CLOUD&#xa;docker network: backend · profiles: infra, fw-update, powertrain" vertex="1">
+          <mxGeometry height="190" width="900" x="40" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="frameBus2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontSize=12;fontStyle=1;" value="MESSAGE BUS&#xa;bridges: backend + vehicle-uprotocol" vertex="1">
+          <mxGeometry height="140" width="320" x="330" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="frameVehicle2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontSize=13;fontStyle=1;" value="&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;IN-VEHICLE&lt;br&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;docker networks: vehicle-uprotocol, vehicle-sovd" vertex="1">
+          <mxGeometry height="680" width="900" x="40" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="frameIdentity2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontSize=13;fontStyle=1;" value="IDENTITY &amp;amp; TRUST PLANE (NEW)&#xa;SPIFFE / SPIRE 1.15.3 · x509 node attestation · JWT-SVIDs" vertex="1">
+          <mxGeometry height="780" width="330" x="990" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="nSpireServer2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;fontStyle=1;" value="spire-server (NEW)&#xa;SPIRE Server :8081&#xa;trust domain root · signs SVIDs" vertex="1">
+          <mxGeometry height="70" width="280" x="1015" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="nRegScript2" parent="1" style="shape=note;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=10;" value="scripts/register_workloads.sh (NEW)&#xa;registers workload entries (Docker selectors)" vertex="1">
+          <mxGeometry height="50" width="280" x="1015" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="nSpireAgentB2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;fontStyle=1;" value="spire-agent-backend (NEW)&#xa;Workload API · UNIX socket volume&#xa;spire-agent-backend-socket" vertex="1">
+          <mxGeometry height="70" width="280" x="1015" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="nSpireAgentV2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;fontStyle=1;" value="spire-agent-vehicle (NEW)&#xa;Workload API · UNIX socket volume&#xa;spire-agent-vehicle-socket" vertex="1">
+          <mxGeometry height="100" width="280" x="1015" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="nDocker2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=10;" value="Docker Engine · /var/run/docker.sock&#xa;used by both agents for&#xa;container workload attestation" vertex="1">
+          <mxGeometry height="60" width="280" x="1015" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="nProfiles2" parent="1" style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacing=8;" value="COMPOSE PROFILES (NEW)&#xa;• infra: dozzle, mosquitto, spire-server, spire-agents&#xa;• fw-update: symphony-api/portal/agent, ecu-updater 0.1.1&#xa;• powertrain: fms, ptc, sovd-cda, ecu-sim, databroker, vehicle-properties&#xa;&#xa;docker compose --profile infra --profile powertrain up -d" vertex="1">
+          <mxGeometry height="130" width="330" x="990" y="870" as="geometry" />
+        </mxCell>
+        <mxCell id="nUser2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="Operator / CI&#xa;curl · trigger_ecu_update.sh&#xa;+ register_workloads.sh" vertex="1">
+          <mxGeometry height="70" width="170" x="40" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="nApi2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="symphony-api&#xa;Control Plane · REST :8082&#xa;(profile: fw-update)" vertex="1">
+          <mxGeometry height="70" width="180" x="330" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="nPortal2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="symphony-portal&#xa;Web UI :3000&#xa;(profile: fw-update)" vertex="1">
+          <mxGeometry height="70" width="150" x="590" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="nFms2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d4e1f5;strokeColor=#333333;fontSize=11;fontStyle=1;" value="fms (CHANGED)&#xa;subscribes SupportedModes&#xa;creates JWT-SVID via JwtSource" vertex="1">
+          <mxGeometry height="70" width="150" x="770" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="nMqtt2" parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;fontStyle=1;" value="mosquitto&#xa;MQTT Broker :1883" vertex="1">
+          <mxGeometry height="70" width="200" x="390" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="nAgent2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="symphony-agent&#xa;Target Agent&#xa;(profile: fw-update)" vertex="1">
+          <mxGeometry height="60" width="170" x="70" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="nUpdater2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="ecu-updater 0.1.1 (bumped)&#xa;uProtocol RPC service&#xa;UP_LOCAL_ADDRESS=up://vehicle/1A100/1/0" vertex="1">
+          <mxGeometry height="70" width="200" x="370" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="nVprops2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d4e1f5;strokeColor=#333333;fontSize=11;fontStyle=1;" value="vehicle-properties (CHANGED)&#xa;publishes Vehicle.Powertrain.SupportedModes&#xa;connected to Workload API" vertex="1">
+          <mxGeometry height="60" width="220" x="700" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="nDbroker2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="databroker&#xa;Kuksa VAL · gRPC :55555&#xa;VSS: + SupportedModes" vertex="1">
+          <mxGeometry height="60" width="200" x="720" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="nPtc2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d4e1f5;strokeColor=#333333;fontSize=11;fontStyle=1;" value="powertrain-mode-controller (CHANGED)&#xa;validates JWT-SVID (aud: powertrain-mode-control)&#xa;+ OPA authz.rego (regorus)" vertex="1">
+          <mxGeometry height="70" width="240" x="70" y="640" as="geometry" />
+        </mxCell>
+        <mxCell id="nCda2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d4e1f5;strokeColor=#333333;fontSize=11;fontStyle=1;" value="sovd-cda (REBUILT: opensovd-cda)&#xa;custom build + spiffe_security_plugin&#xa;validates JWT-SVID (aud: sovd.cda) + OPA authz.rego&#xa;SOVD/HTTP :20002" vertex="1">
+          <mxGeometry height="80" width="240" x="70" y="790" as="geometry" />
+        </mxCell>
+        <mxCell id="nEcusim2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="ecu-sim&#xa;Simulated ECU (blueprint-ecu)&#xa;DoIP + Control HTTP :8181" vertex="1">
+          <mxGeometry height="70" width="210" x="70" y="950" as="geometry" />
+        </mxCell>
+        <mxCell id="nSteps2" parent="1" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fillColor=#ffffff;strokeColor=#333333;spacing=10;fontSize=11;" value="&lt;b&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;MESSAGE FLOW (CHANGES vs OLD IN PURPLE)&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;&lt;font color=&quot;#9673a6&quot;&gt;SPIFFE IDENTITY (ALL NEW)&lt;/font&gt;&lt;/b&gt;&lt;br&gt;S1  spire-agents → spire-server : node attestation via x509 certs, TLS :8081&lt;br&gt;S2  operator runs register_workloads.sh : registers fms, ptc, vehicle-properties, cda (Docker selectors)&lt;br&gt;S3  workloads → their spire-agent : SPIFFE Workload API over UNIX socket (shared volume)&lt;br&gt;S4  fms fetches JWT-SVID (aud: powertrain-mode-control) · ptc fetches JWT-SVID (aud: sovd.cda)&lt;br&gt;S5  ptc + cda validate incoming JWT-SVIDs via Workload API, then evaluate OPA authz.rego (regorus)&lt;br&gt;&lt;br&gt;&lt;b&gt;&lt;font color=&quot;#d79b00&quot;&gt;OTA FIRMWARE UPDATE (unchanged flow; profile fw-update)&lt;/font&gt;&lt;/b&gt;&lt;br&gt;A1–A8  same as OLD · ecu-updater bumped to 0.1.1, UP_LOCAL_ADDRESS addressing&lt;br&gt;&lt;br&gt;&lt;b&gt;&lt;font color=&quot;#6c8ebf&quot;&gt;POWERTRAIN MODE CONFIG CHANGE (profile: powertrain)&lt;/font&gt;&lt;/b&gt;&lt;br&gt;B0  &lt;font color=&quot;#9673a6&quot;&gt;vehicle-properties → fms : publishes SupportedModes; fms cycles only reported modes&lt;/font&gt;&lt;br&gt;B1  fms → mosquitto : uProtocol RPC setCurrentMode + &lt;font color=&quot;#9673a6&quot;&gt;JWT-SVID (aud: powertrain-mode-control)&lt;/font&gt;&lt;br&gt;B2  mosquitto → ptc : deliver RPC request → &lt;font color=&quot;#9673a6&quot;&gt;ptc validates JWT + OPA policy check&lt;/font&gt;&lt;br&gt;B3  ptc → sovd-cda : HTTP PUT .../data/powertrain_mode · Bearer = &lt;font color=&quot;#9673a6&quot;&gt;&lt;b&gt;fresh JWT-SVID (aud: sovd.cda)&lt;/b&gt;&lt;/font&gt;&lt;br&gt;B3a &lt;font color=&quot;#9673a6&quot;&gt;cda validates JWT via spiffe_security_plugin + OPA authz.rego&lt;/font&gt;&lt;br&gt;B4  sovd-cda → ecu-sim : UDS WriteDataByIdentifier  2E 4E 66   over DoIP&lt;br&gt;B5  ecu-sim → sovd-cda : UDS positive response  6E 4E 66&lt;br&gt;B6–B8  responses back to fms (unchanged)&lt;br&gt;&lt;br&gt;&lt;b&gt;&lt;font color=&quot;#82b366&quot;&gt;VEHICLE SIGNALS&lt;/font&gt;&lt;/b&gt;&lt;br&gt;C1  vehicle-properties ↔ databroker : gRPC Kuksa VAL (:55555) · &lt;font color=&quot;#9673a6&quot;&gt;+ SupportedModes in VSS&lt;/font&gt;&lt;br&gt;C2  vehicle-properties ↔ mosquitto : uProtocol pub/sub (MQTT5)" vertex="1">
+          <mxGeometry height="380" width="540" x="350" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="eA12x" edge="1" parent="1" source="nUser2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#d79b00;fontColor=#d79b00;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="nApi2" value="A1–A2  REST/HTTPS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eA36x" edge="1" parent="1" source="nApi2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#d79b00;fontColor=#d79b00;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.4;exitY=1;entryX=0.27;entryY=0.014;entryDx=0;entryDy=0;entryPerimeter=0;" target="nMqtt2" value="A3 / A6  MQTT coa-request/response">
+          <mxGeometry relative="1" x="0.0336" y="25" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eA45x" edge="1" parent="1" source="nMqtt2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#d79b00;fontColor=#d79b00;strokeWidth=2;startArrow=block;endArrow=block;exitX=0;exitY=0.25;entryX=0.5;entryY=0;exitDx=0;exitDy=0;" target="nAgent2" value="A4 / A5  MQTT coa-request/response">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eA78x" edge="1" parent="1" source="nAgent2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#d79b00;fontColor=#d79b00;strokeWidth=2;startArrow=block;endArrow=block;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="nUpdater2" value="A7 / A8  uProtocol RPC (MQTT5)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eB18x" edge="1" parent="1" source="nFms2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#6c8ebf;fontColor=#6c8ebf;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.5;exitY=1;entryX=0.85;entryY=0;" target="nMqtt2" value="B1 / B8  uProtocol RPC + JWT-SVID (MQTT5)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eB27x" edge="1" parent="1" source="nMqtt2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#6c8ebf;fontColor=#6c8ebf;strokeWidth=2;startArrow=block;endArrow=block;exitX=0;exitY=0.5;entryX=0.7;entryY=1;" target="nPtc2" value="B2 / B7  uProtocol RPC (MQTT5)">
+          <mxGeometry relative="1" x="-0.0157" y="-25" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eB36x" edge="1" parent="1" source="nPtc2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="nCda2" value="B3 / B6  HTTP SOVD · Bearer = JWT-SVID (aud: sovd.cda)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eB45x" edge="1" parent="1" source="nCda2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#6c8ebf;fontColor=#6c8ebf;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="nEcusim2" value="B4 / B5  UDS over DoIP (2E../6E..)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eC1x" edge="1" parent="1" source="nVprops2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#82b366;fontColor=#82b366;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="nDbroker2" value="C1  gRPC Kuksa VAL :55555">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eC2x" edge="1" parent="1" source="nVprops2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#82b366;fontColor=#82b366;strokeWidth=2;startArrow=block;endArrow=block;exitX=0;exitY=0.25;entryX=0.755;entryY=0.971;entryDx=0;entryDy=0;entryPerimeter=0;" target="nMqtt2" value="C2  uProtocol pub/sub (MQTT5)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eP1x" edge="1" parent="1" source="nPortal2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=9;strokeColor=#999999;fontColor=#999999;exitX=0.5;exitY=1;entryX=0.85;entryY=1;" target="nApi2" value="M  REST poll">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eS1b" edge="1" parent="1" source="nSpireAgentB2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="nSpireServer2" value="S1  node attestation (x509, TLS :8081)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eS1v" edge="1" parent="1" source="nSpireAgentV2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;exitX=1;exitY=0.5;entryX=1;entryY=0.5;" target="nSpireServer2" value="S1  node attestation (x509)">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1360" y="595" />
+              <mxPoint x="1360" y="165" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eSreg" edge="1" parent="1" source="nRegScript2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=9;strokeColor=#9673a6;fontColor=#9673a6;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="nSpireServer2" value="S2  register workload entries">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eSfms" edge="1" parent="1" source="nFms2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;startArrow=block;endArrow=block;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="nSpireAgentB2" value="S3/S4  Workload API (UNIX socket) · fetch JWT-SVID">
+          <mxGeometry relative="1" x="0.0877" y="10" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="960" y="185" />
+              <mxPoint x="960" y="375" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eSvprops" edge="1" parent="1" source="nVprops2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;startArrow=block;endArrow=block;exitX=1;exitY=0.5;entryX=0;entryY=0.25;" target="nSpireAgentV2" value="S3  Workload API">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eSptc" edge="1" parent="1" source="nPtc2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;startArrow=block;endArrow=block;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="nSpireAgentV2" value="S3/S4/S5  validate + fetch JWT-SVID">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="950" y="675" />
+              <mxPoint x="950" y="540" />
+              <mxPoint x="1000" y="540" />
+              <mxPoint x="1000" y="535" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eScda" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;startArrow=block;endArrow=block;exitX=1;exitY=0.5;entryX=0.001;entryY=0.815;entryDx=0;entryDy=0;entryPerimeter=0;" target="nSpireAgentV2" value="S5  validate JWT-SVID (spiffe_security_plugin)">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="960" y="830" />
+              <mxPoint x="960" y="580" />
+              <mxPoint x="1005" y="580" />
+              <mxPoint x="1005" y="581.5" />
+            </Array>
+            <mxPoint x="300" y="830.0000000000001" as="sourcePoint" />
+            <mxPoint x="1005" y="574.9999999999999" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eSdockB" edge="1" parent="1" source="nSpireAgentB2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=9;strokeColor=#999999;fontColor=#999999;exitX=0.25;exitY=1;entryX=0.25;entryY=0;" target="nDocker2" value="attest">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eSdockV" edge="1" parent="1" source="nSpireAgentV2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=9;strokeColor=#999999;fontColor=#999999;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="nDocker2" value="attest">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eB0x" edge="1" parent="1" source="nVprops2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;exitX=0.5;exitY=0;entryX=0.8;entryY=1;" target="nFms2" value="B0 (NEW)  SupportedModes via uProtocol pub/sub">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="780" y="500" />
+              <mxPoint x="780" y="360" />
+              <mxPoint x="890" y="360" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="CURRENT — Issue 7 (CDA via Unix socket + ECU lock)" id="arch-issue7">
+    <mxGraphModel dx="996" dy="549" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1240" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="frameBackend3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontSize=13;fontStyle=1;" value="BACKEND / CLOUD&#xa;docker network: backend · profiles: infra, fw-update, powertrain" vertex="1">
+          <mxGeometry height="190" width="900" x="40" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="frameBus3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontSize=12;fontStyle=1;" value="MESSAGE BUS&#xa;bridges: backend + vehicle-uprotocol" vertex="1">
+          <mxGeometry height="140" width="320" x="330" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="frameVehicle3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;align=center;spacingTop=8;fontSize=13;fontStyle=1;" value="IN-VEHICLE&#xa;docker networks: vehicle-uprotocol · vehicle-sovd (sovd-cda ↔ ecu-sim only)" vertex="1">
+          <mxGeometry height="680" width="900" x="40" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="frameIdentity3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontSize=13;fontStyle=1;" value="IDENTITY &amp;amp; TRUST PLANE&#xa;SPIFFE / SPIRE 1.15.3 · x509 node attestation · JWT-SVIDs" vertex="1">
+          <mxGeometry height="780" width="330" x="990" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="nSpireServer3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;fontStyle=1;" value="spire-server&#xa;SPIRE Server :8081&#xa;trust domain root · signs SVIDs" vertex="1">
+          <mxGeometry height="70" width="280" x="1015" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="nRegScript3" parent="1" style="shape=note;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=10;" value="scripts/register_workloads.sh&#xa;registers fms, ptc, vehicle-properties (Docker selectors)" vertex="1">
+          <mxGeometry height="50" width="280" x="1015" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="nSpireAgentB3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;fontStyle=1;" value="spire-agent-backend&#xa;Workload API · UNIX socket volume&#xa;spire-agent-backend-socket" vertex="1">
+          <mxGeometry height="70" width="280" x="1015" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="nSpireAgentV3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;fontStyle=1;" value="spire-agent-vehicle&#xa;Workload API · UNIX socket volume&#xa;spire-agent-vehicle-socket" vertex="1">
+          <mxGeometry height="100" width="280" x="1015" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="nDocker3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=10;" value="Docker Engine · /var/run/docker.sock&#xa;used by both agents for&#xa;container workload attestation" vertex="1">
+          <mxGeometry height="60" width="280" x="1015" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="nProfiles3" parent="1" style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacing=8;" value="COMPOSE PROFILES&#xa;• infra: dozzle, mosquitto, spire-server, spire-agents&#xa;• fw-update: symphony-api/portal/agent, ecu-updater 0.1.1&#xa;• powertrain: fms, ptc, sovd-cda, ecu-sim, databroker, vehicle-properties&#xa;&#xa;docker compose --profile infra --profile powertrain up -d" vertex="1">
+          <mxGeometry height="130" width="330" x="990" y="870" as="geometry" />
+        </mxCell>
+        <mxCell id="nIssue7Note3" parent="1" style="shape=note;whiteSpace=wrap;html=1;fillColor=#b0e3e6;strokeColor=#0e8088;fontSize=11;align=left;spacing=8;" value="ISSUE 7 — CDA ACCESS HARDENING&#xa;• CDA has no TCP port: SOVD only via Unix socket&#xa;• Volume cda-sovd-socket: sovd-cda (rw), ptc (ro) only&#xa;• /run/cda 0750 · cda.sock 0770 · owner 10001:10100&#xa;• ptc removed from vehicle-sovd network&#xa;• CDA + ptc non-root, cap_drop ALL, no-new-privileges&#xa;• CDA pinned to hackathon fork 58f0c90 → ECU lock required for writes&#xa;• Known limitation: lock endpoints not covered by OPA (TC17)" vertex="1">
+          <mxGeometry height="200" width="330" x="990" y="1015" as="geometry" />
+        </mxCell>
+        <mxCell id="nUser3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="Operator / CI&#xa;curl · trigger_ecu_update.sh&#xa;+ register_workloads.sh" vertex="1">
+          <mxGeometry height="70" width="170" x="40" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="nApi3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="symphony-api&#xa;Control Plane · REST :8082&#xa;(profile: fw-update)" vertex="1">
+          <mxGeometry height="70" width="180" x="330" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="nPortal3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="symphony-portal&#xa;Web UI :3000&#xa;(profile: fw-update)" vertex="1">
+          <mxGeometry height="70" width="150" x="590" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="nFms3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="fms&#xa;subscribes SupportedModes&#xa;creates JWT-SVID via JwtSource" vertex="1">
+          <mxGeometry height="70" width="150" x="770" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="nMqtt3" parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;fontStyle=1;" value="mosquitto&#xa;MQTT Broker :1883" vertex="1">
+          <mxGeometry height="70" width="200" x="390" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="nAgent3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="symphony-agent&#xa;Target Agent&#xa;(profile: fw-update)" vertex="1">
+          <mxGeometry height="60" width="170" x="70" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="nUpdater3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="ecu-updater 0.1.1&#xa;uProtocol RPC service&#xa;UP_LOCAL_ADDRESS=up://vehicle/1A100/1/0" vertex="1">
+          <mxGeometry height="70" width="200" x="370" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="nVprops3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="vehicle-properties&#xa;publishes Vehicle.Powertrain.SupportedModes&#xa;connected to Workload API" vertex="1">
+          <mxGeometry height="60" width="220" x="700" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="nDbroker3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="databroker&#xa;Kuksa VAL · gRPC :55555&#xa;VSS: + SupportedModes" vertex="1">
+          <mxGeometry height="60" width="200" x="720" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="nPtc3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b0e3e6;strokeColor=#0e8088;fontSize=11;fontStyle=1;" value="powertrain-mode-controller (CHANGED, issue 7)&#xa;JWT-SVID + OPA authz.rego (unchanged)&#xa;SOVD client via Unix socket · ECU lock per write&#xa;user 10002:10100 · vehicle-uprotocol only" vertex="1">
+          <mxGeometry height="80" width="240" x="70" y="625" as="geometry" />
+        </mxCell>
+        <mxCell id="nSocket3" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=8;fillColor=#b0e3e6;strokeColor=#0e8088;fontSize=10;fontStyle=1;" value="volume cda-sovd-socket (NEW)&#xa;/run/cda/cda.sock · dir 0750 · sock 0770&#xa;B3/B6: lock → PUT → release&#xa;Bearer JWT-SVID · ptc mounts ro" vertex="1">
+          <mxGeometry height="80" width="230" x="330" y="612" as="geometry" />
+        </mxCell>
+        <mxCell id="nCda3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b0e3e6;strokeColor=#0e8088;fontSize=11;fontStyle=1;" value="sovd-cda (CHANGED, issue 7)&#xa;CDA fork 58f0c90 + spiffe_security_plugin&#xa;JWT-SVID (aud: sovd.cda) + lock + OPA authz.rego&#xa;NO TCP port · SOVD/HTTP over Unix socket&#xa;user 10001:10100 · cap_drop ALL" vertex="1">
+          <mxGeometry height="100" width="240" x="70" y="790" as="geometry" />
+        </mxCell>
+        <mxCell id="nEcusim3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=11;fontStyle=1;" value="ecu-sim&#xa;Simulated ECU (blueprint-ecu)&#xa;DoIP + Control HTTP :8181" vertex="1">
+          <mxGeometry height="70" width="210" x="70" y="950" as="geometry" />
+        </mxCell>
+        <mxCell id="nSteps3" parent="1" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fillColor=#ffffff;strokeColor=#333333;spacing=10;fontSize=11;" value="&lt;b&gt;MESSAGE FLOW (ISSUE 7 CHANGES IN TEAL)&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;&lt;font color=&quot;#9673a6&quot;&gt;SPIFFE IDENTITY (unchanged)&lt;/font&gt;&lt;/b&gt;&lt;br&gt;S1  spire-agents → spire-server : node attestation (x509, TLS :8081)&lt;br&gt;S2  register_workloads.sh : fms, ptc, vehicle-properties (Docker selectors)&lt;br&gt;S3/S4  workloads ↔ spire-agent : Workload API (UNIX socket) · fetch JWT-SVIDs&lt;br&gt;S5  ptc + cda validate JWT-SVIDs, then evaluate OPA authz.rego&lt;br&gt;&lt;br&gt;&lt;b&gt;&lt;font color=&quot;#d79b00&quot;&gt;OTA FIRMWARE UPDATE (unchanged, profile fw-update)&lt;/font&gt;&lt;/b&gt;&lt;br&gt;A1–A8  operator → symphony-api → mosquitto → symphony-agent → ecu-updater&lt;br&gt;&lt;br&gt;&lt;b&gt;&lt;font color=&quot;#6c8ebf&quot;&gt;POWERTRAIN MODE CONFIG CHANGE (profile powertrain)&lt;/font&gt;&lt;/b&gt;&lt;br&gt;B0  vehicle-properties → fms : SupportedModes&lt;br&gt;B1/B2  fms → mosquitto → ptc : setCurrentMode + JWT-SVID → JWT + OPA check&lt;br&gt;B3  &lt;font color=&quot;#0e8088&quot;&gt;ptc → sovd-cda via /run/cda/cda.sock (no TCP), Bearer JWT-SVID (aud sovd.cda):&lt;/font&gt;&lt;br&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp;&lt;font color=&quot;#0e8088&quot;&gt;① POST …/blueprint-ecu/locks (10 s)  ② PUT …/data/powertrain_mode  ③ DELETE …/locks/{id}&lt;/font&gt;&lt;br&gt;B3a  &lt;font color=&quot;#0e8088&quot;&gt;kernel: group 10100 + mode 0770 on connect()&lt;/font&gt; · cda: JWT + &lt;font color=&quot;#0e8088&quot;&gt;lock held&lt;/font&gt; + OPA authz.rego&lt;br&gt;B4/B5  sovd-cda → ecu-sim : UDS 2E 4E 66 / 6E 4E 66 over DoIP (vehicle-sovd)&lt;br&gt;B6–B8  responses back to fms&lt;br&gt;&lt;br&gt;&lt;b&gt;&lt;font color=&quot;#82b366&quot;&gt;VEHICLE SIGNALS&lt;/font&gt;&lt;/b&gt;&lt;br&gt;C1  vehicle-properties ↔ databroker : gRPC Kuksa VAL (:55555)&lt;br&gt;C2  vehicle-properties ↔ mosquitto : uProtocol pub/sub (MQTT5)" vertex="1">
+          <mxGeometry height="390" width="520" x="370" y="725" as="geometry" />
+        </mxCell>
+        <mxCell id="eA12y" edge="1" parent="1" source="nUser3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#d79b00;fontColor=#d79b00;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="nApi3" value="A1–A2  REST/HTTPS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eA36y" edge="1" parent="1" source="nApi3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#d79b00;fontColor=#d79b00;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.4;exitY=1;entryX=0.27;entryY=0.014;entryDx=0;entryDy=0;entryPerimeter=0;" target="nMqtt3" value="A3 / A6  MQTT coa-request/response">
+          <mxGeometry relative="1" x="0.0336" y="25" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eA45y" edge="1" parent="1" source="nMqtt3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#d79b00;fontColor=#d79b00;strokeWidth=2;startArrow=block;endArrow=block;exitX=0;exitY=0.25;entryX=0.5;entryY=0;exitDx=0;exitDy=0;" target="nAgent3" value="A4 / A5  MQTT coa-request/response">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eA78y" edge="1" parent="1" source="nAgent3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#d79b00;fontColor=#d79b00;strokeWidth=2;startArrow=block;endArrow=block;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="nUpdater3" value="A7 / A8  uProtocol RPC (MQTT5)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eB18y" edge="1" parent="1" source="nFms3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#6c8ebf;fontColor=#6c8ebf;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.5;exitY=1;entryX=0.85;entryY=0;" target="nMqtt3" value="B1 / B8  uProtocol RPC + JWT-SVID (MQTT5)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eB27y" edge="1" parent="1" source="nMqtt3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#6c8ebf;fontColor=#6c8ebf;strokeWidth=2;startArrow=block;endArrow=block;exitX=0;exitY=0.5;entryX=0.7;entryY=1;" target="nPtc3" value="B2 / B7  uProtocol RPC (MQTT5)">
+          <mxGeometry relative="1" x="-0.0157" y="-25" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eUds1" edge="1" parent="1" source="nPtc3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#0e8088;fontColor=#0e8088;strokeWidth=2;startArrow=block;endArrow=block;exitX=1;exitY=0.3;entryX=0;entryY=0.5;" target="nSocket3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eUds2" edge="1" parent="1" source="nSocket3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#0e8088;fontColor=#0e8088;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.05;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.3;entryDx=0;entryDy=0;" target="nCda3" value="listens (rw)">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="342" y="820" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eB45y" edge="1" parent="1" source="nCda3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#6c8ebf;fontColor=#6c8ebf;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="nEcusim3" value="B4 / B5  UDS over DoIP (2E../6E..) · vehicle-sovd">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eC1y" edge="1" parent="1" source="nVprops3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#82b366;fontColor=#82b366;strokeWidth=2;startArrow=block;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="nDbroker3" value="C1  gRPC Kuksa VAL :55555">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eC2y" edge="1" parent="1" source="nVprops3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#82b366;fontColor=#82b366;strokeWidth=2;startArrow=block;endArrow=block;exitX=0;exitY=0.25;entryX=0.755;entryY=0.971;entryDx=0;entryDy=0;entryPerimeter=0;" target="nMqtt3" value="C2  uProtocol pub/sub (MQTT5)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eP1y" edge="1" parent="1" source="nPortal3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=9;strokeColor=#999999;fontColor=#999999;exitX=0.5;exitY=1;entryX=0.85;entryY=1;" target="nApi3" value="M  REST poll">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eS1by" edge="1" parent="1" source="nSpireAgentB3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="nSpireServer3" value="S1  node attestation (x509, TLS :8081)">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eS1vy" edge="1" parent="1" source="nSpireAgentV3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;exitX=1;exitY=0.5;entryX=1;entryY=0.5;" target="nSpireServer3" value="S1  node attestation (x509)">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1360" y="550" />
+              <mxPoint x="1360" y="165" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eSregy" edge="1" parent="1" source="nRegScript3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=9;strokeColor=#9673a6;fontColor=#9673a6;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="nSpireServer3" value="S2  register workload entries">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eSfmsy" edge="1" parent="1" source="nFms3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;startArrow=block;endArrow=block;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="nSpireAgentB3" value="S3/S4  Workload API (UNIX socket) · fetch JWT-SVID">
+          <mxGeometry relative="1" x="0.0877" y="10" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="960" y="185" />
+              <mxPoint x="960" y="375" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eSvpropsy" edge="1" parent="1" source="nVprops3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;startArrow=block;endArrow=block;exitX=1;exitY=0.5;entryX=0;entryY=0.25;" target="nSpireAgentV3" value="S3  Workload API">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eSptcy" edge="1" parent="1" source="nPtc3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;startArrow=block;endArrow=block;exitX=1;exitY=0.875;exitDx=0;exitDy=0;entryX=0;entryY=0.5;" target="nSpireAgentV3" value="S3/S4/S5  validate + fetch JWT-SVID">
+          <mxGeometry relative="1" x="0.3" y="-10" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="950" y="695" />
+              <mxPoint x="950" y="550" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eScday" edge="1" parent="1" source="nCda3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;startArrow=block;endArrow=block;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0.001;entryY=0.815;entryDx=0;entryDy=0;entryPerimeter=0;" target="nSpireAgentV3" value="S5  validate JWT-SVID (spiffe_security_plugin)">
+          <mxGeometry relative="1" x="0.6" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="960" y="860" />
+              <mxPoint x="960" y="581" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eSdockBy" edge="1" parent="1" source="nSpireAgentB3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=9;strokeColor=#999999;fontColor=#999999;exitX=0.25;exitY=1;entryX=0.25;entryY=0;" target="nDocker3" value="attest">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eSdockVy" edge="1" parent="1" source="nSpireAgentV3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=9;strokeColor=#999999;fontColor=#999999;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="nDocker3" value="attest">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eB0y" edge="1" parent="1" source="nVprops3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=10;strokeColor=#9673a6;fontColor=#9673a6;strokeWidth=2;exitX=0.5;exitY=0;entryX=0.8;entryY=1;" target="nFms3" value="B0  SupportedModes via uProtocol pub/sub">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="780" y="500" />
+              <mxPoint x="780" y="360" />
+              <mxPoint x="890" y="360" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
