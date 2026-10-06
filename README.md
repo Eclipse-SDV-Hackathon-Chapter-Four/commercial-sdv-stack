@@ -203,7 +203,9 @@ sequenceDiagram
 ```
 
 1. The _Fleet Managament System_ sets the powertrain mode to _Economy_ by means of a uProtocol RPC call to the _Powertrain Mode Controller_.
+<!-- AI-modified (GitHub Copilot, Claude Opus 5.5) - issue 7: begin -->
 2. The _Powertrain Mode Controller_ sets the powertrain mode to _Economy_ by acquiring a short-lived lock on the ECU and updating the corresponding SOVD entity's data value by means of an HTTP PUT request on the _CDA Server_ (via the CDA's Unix domain socket). The lock is released again afterwards.
+<!-- AI-modified - issue 7: end -->
 3. The _CDA Server_ sets the powertrain mode to _Economy_ by means of invoking the _Powertrain_Mode_Write_ operation on the _Blueprint ECU_ via UDS.
 
 ### What's in the Box?
@@ -224,6 +226,7 @@ This project copy of the upstream CDA testcontainer is modified to better repres
 - creating appropriately named ODX service definitions (by modifying the odx generation scripts)
 - implementing the ecu-sim counterpart to these services (by modifying the ecu-simulation code)
 
+<!-- AI-modified (GitHub Copilot, Claude Opus 5.5) - issue 7: begin -->
 ### Service APIs
 
 - SOVD API: only available via the Unix domain socket `/run/cda/cda.sock` in the `commercial-sdv-stack_cda-sovd-socket` volume (base URI `http://localhost/vehicle/v15`, see [Securing Access to the CDA](#securing-access-to-the-cda))
@@ -279,3 +282,4 @@ A Unix domain socket is a good fit as long as client and CDA share the same kern
 - encryption and mutual authentication in transit are required (e.g. ISO/SAE 21434, UNECE R155).
 
 **Known limitation:** the CDA's lock endpoints are not subject to the Rego authorization, so any workload with access to the socket and a valid JWT-SVID can acquire an ECU lock.
+<!-- AI-modified - issue 7: end -->
