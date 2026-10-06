@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
@@ -51,6 +51,11 @@ pub(crate) struct Cli {
         },
     )]
     sovd_server_base_uri: url::Url,
+    /// The path of a Unix domain socket to use for connecting to the SOVD server.
+    /// If set, all SOVD requests are sent via this socket and the host part of the
+    /// SOVD server base URI is only used for the HTTP Host header.
+    #[arg(long, value_name = "PATH", env = "SOVD_SERVER_UNIX_SOCKET")]
+    sovd_server_unix_socket: Option<PathBuf>,
     /// The resource path on the SOVD server that is used to set the powertrain mode.
     /// This value will be appended to the SOVD server's base URI to form the full URL.
     /// Must be a relative path (i.e. must not start with a slash).
@@ -106,6 +111,10 @@ enum Commands {
 impl Cli {
     pub(crate) fn get_sovd_server_uri(&self) -> &url::Url {
         &self.sovd_server_base_uri
+    }
+
+    pub(crate) fn get_sovd_server_unix_socket(&self) -> Option<&PathBuf> {
+        self.sovd_server_unix_socket.as_ref()
     }
 
     pub(crate) fn get_sovd_powertrain_mode_resource_url(

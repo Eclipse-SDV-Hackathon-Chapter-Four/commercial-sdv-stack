@@ -48,4 +48,13 @@ COPY --from=builder --chmod=755 /home/rust/cda/entrypoint.sh /app/entrypoint.sh
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 RUN mkdir -p /app/odx
 
+# Non-root CDA user; clients of the SOVD Unix socket must be members of the sovd-clients group
+RUN groupadd --gid 10100 sovd-clients \
+    && useradd --uid 10001 --gid 10100 --no-create-home --shell /usr/sbin/nologin cda \
+    && mkdir -p /run/cda \
+    && chown 10001:10100 /run/cda \
+    && chmod 0750 /run/cda
+
+USER 10001:10100
+
 ENTRYPOINT ["/app/entrypoint.sh"]
