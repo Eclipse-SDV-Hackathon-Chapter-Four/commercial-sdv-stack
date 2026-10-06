@@ -12,6 +12,8 @@
 #
 package authz
 
+default allow := false
+
 allow if {
     # Check if method ID is allowed for given user.
     input.method_id in data.allowed_method_ids[input.spiffe_id]

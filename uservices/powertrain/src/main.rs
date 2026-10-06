@@ -35,6 +35,12 @@ async fn get_rpc_server(cli: cli::Cli) -> Result<InMemoryRpcServer, Box<dyn std:
     Ok(InMemoryRpcServer::new(transport, uri_provider))
 }
 
+/// Fails closed: only an explicit `true` grants access. A Rego rule that does not match
+/// evaluates to `Undefined` (not `false`), so anything other than `true` must be denied.
+fn is_authorized(decision: &regorus::Value) -> bool {
+    matches!(decision, regorus::Value::Bool(true))
+}
+
 // { "data": { "Mode": "Performance" } }
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Root {
@@ -93,7 +99,14 @@ impl CurrentModeController {
             debug!("Failed to authorize request using OPA: {e}");
             ServiceInvocationError::Internal(String::from("authorization error"))
         })?;
-        if allowed.eq(&regorus::Value::Bool(false)) {
+        if is_authorized(&allowed) {
+            debug!(
+                "Authorization successful for SPIFFE ID {} and method ID {}",
+                svid.spiffe_id(),
+                method_id
+            );
+            Ok(svid)
+        } else {
             debug!(
                 "Authorization failed for SPIFFE ID {} and method ID {}",
                 svid.spiffe_id(),
@@ -102,13 +115,6 @@ impl CurrentModeController {
             Err(ServiceInvocationError::PermissionDenied(String::from(
                 "not authorized to invoke method",
             )))
-        } else {
-            debug!(
-                "Authorization successful for SPIFFE ID {} and method ID {}",
-                svid.spiffe_id(),
-                method_id
-            );
-            Ok(svid)
         }
     }
 
@@ -260,4 +266,73 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::signal::ctrl_c().await?;
     info!("Powertrain mode control service is shutting down");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_authorized;
+    use common::open_policy_agent::OpaConfig;
+    use regorus::{CompiledPolicy, Value};
+
+    const FMS: &str = "spiffe://sdv.eclipse.org/backend/fms";
+    const VEHICLE_PROPERTIES: &str = "spiffe://sdv.eclipse.org/vehicle/properties";
+
+    fn shipped_policy() -> CompiledPolicy {
+        let config_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../config/powertrain-mode-controller");
+        OpaConfig {
+            policy_file: config_dir.join("authz.rego"),
+            authorization_data_file: config_dir.join("authorization-data.json"),
+            auth_rule_entrypoint: "data.authz.allow".to_string(),
+        }
+        .get_compiled_auth_policy()
+        .expect("shipped authorization policy must compile")
+    }
+
+    fn evaluate(policy: &CompiledPolicy, input: serde_json::Value) -> Value {
+        policy
+            .eval_with_input(Value::from_json_str(&input.to_string()).unwrap())
+            .expect("policy evaluation must succeed")
+    }
+
+    #[test]
+    fn only_explicit_true_is_authorized() {
+        assert!(is_authorized(&Value::Bool(true)));
+        assert!(!is_authorized(&Value::Bool(false)));
+        assert!(!is_authorized(&Value::Undefined));
+        assert!(!is_authorized(&Value::Null));
+        assert!(!is_authorized(&Value::from(1)));
+        assert!(!is_authorized(&Value::from("true")));
+    }
+
+    #[test]
+    fn shipped_policy_allows_configured_methods() {
+        let policy = shipped_policy();
+        for method_id in [1, 2] {
+            let decision = evaluate(
+                &policy,
+                serde_json::json!({ "spiffe_id": FMS, "method_id": method_id }),
+            );
+            assert_eq!(decision, Value::Bool(true), "FMS method {method_id}");
+            assert!(is_authorized(&decision));
+        }
+    }
+
+    #[test]
+    fn shipped_policy_explicitly_denies_unmatched_requests() {
+        let policy = shipped_policy();
+        let unmatched = [
+            serde_json::json!({ "spiffe_id": VEHICLE_PROPERTIES, "method_id": 2 }),
+            serde_json::json!({ "spiffe_id": "spiffe://sdv.eclipse.org/unknown", "method_id": 2 }),
+            serde_json::json!({ "spiffe_id": FMS, "method_id": 3 }),
+            serde_json::json!({ "spiffe_id": FMS }),
+            serde_json::json!({ "method_id": 2 }),
+            serde_json::json!({ "spiffe_id": FMS, "method_id": "2" }),
+        ];
+        for input in unmatched {
+            let decision = evaluate(&policy, input.clone());
+            assert_eq!(decision, Value::Bool(false), "input: {input}");
+            assert!(!is_authorized(&decision), "input: {input}");
+        }
+    }
 }
