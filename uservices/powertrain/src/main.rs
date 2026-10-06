@@ -59,8 +59,12 @@ struct CurrentModeController {
 
 impl CurrentModeController {
     async fn new(cli: &Cli) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut http_client_builder = reqwest::Client::builder();
+        if let Some(socket_path) = cli.get_sovd_server_unix_socket() {
+            http_client_builder = http_client_builder.unix_socket(socket_path.as_path());
+        }
         Ok(Self {
-            http_client: reqwest::Client::builder().build()?,
+            http_client: http_client_builder.build()?,
             powertrain_sovd_url: cli.get_sovd_powertrain_mode_resource_url()?,
             powertrain_lock_url: cli.get_sovd_powertrain_lock_resource_url()?,
             workload_api: WorkloadApiClient::connect_env().await?,
@@ -312,6 +316,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
     let cli = cli::Cli::parse();
     let sovd_server_uri = cli.get_sovd_server_uri().to_owned();
+    let sovd_server_unix_socket = cli
+        .get_sovd_server_unix_socket()
+        .map_or_else(|| String::from("none"), |p| p.display().to_string());
     let mode_controller = CurrentModeController::new(&cli).await.map(Arc::new)?;
 
     let rpc_server = get_rpc_server(cli).await?;
@@ -330,8 +337,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     info!(
-        "Powertrain mode control service is running [SOVD CDA Server: {}]",
-        sovd_server_uri
+        "Powertrain mode control service is running [SOVD CDA Server: {}, Unix socket: {}]",
+        sovd_server_uri, sovd_server_unix_socket
     );
     tokio::signal::ctrl_c().await?;
     info!("Powertrain mode control service is shutting down");

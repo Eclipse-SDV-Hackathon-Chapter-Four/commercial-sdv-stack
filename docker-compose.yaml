@@ -27,6 +27,7 @@ volumes:
   mosquitto-logs:
   spire-agent-backend-socket:
   spire-agent-vehicle-socket:
+  cda-sovd-socket:
 
 configs:
   trust-store:
@@ -299,20 +300,27 @@ services:
       dockerfile: ./powertrain/Dockerfile
     networks:
       - vehicle-uprotocol
-      - vehicle-sovd
     environment:
       - UP_LOCAL_ADDRESS=up://vehicle/10301/1/0
       - RUST_LOG=info,powertrain=info
       - MQTT_BROKER_URI=mqtt://mosquitto:1883
       - MQTT_CLIENT_ID=powertrain-mode-controller
-      - SOVD_SERVER_BASE_URI=http://sovd-cda:20002/vehicle/v15/
+      # the host part is only used for the HTTP Host header when connecting via the Unix socket
+      - SOVD_SERVER_BASE_URI=http://localhost/vehicle/v15/
+      - SOVD_SERVER_UNIX_SOCKET=/run/cda/cda.sock
       - SOVD_POWERTRAIN_MODE_RESOURCE_PATH=components/blueprint-ecu/data/powertrain_mode
       - SPIFFE_ENDPOINT_SOCKET=unix:/tmp/spire-agent/public/api.sock
+    # member of the sovd-clients group (GID 10100) which may connect to the CDA Unix socket
+    user: "10002:10100"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       mosquitto:
         condition: service_healthy
       sovd-cda:
-        condition: service_started
+        condition: service_healthy
       spire-agent-vehicle:
         condition: service_started
     volumes:
@@ -325,6 +333,11 @@ services:
         source: spire-agent-vehicle-socket
         target: /tmp/spire-agent/public
         read_only: false
+      # the following is needed to talk to the CDA's SOVD API (via UNIX domain socket)
+      - type: volume
+        source: cda-sovd-socket
+        target: /run/cda
+        read_only: true
     command: ["mqtt5"]
   sovd-cda:
     profiles:
@@ -338,8 +351,7 @@ services:
         - SOURCE_DATE_EPOCH=0
         # the SHA of the git ref we use in uservices/cda/Cargo.toml
         - SOURCE_GIT_SHA=58f0c9044e2585d5dd264a980935c43d3c921250
-    ports:
-      - "${CDA_PORT:-20002}:20002"
+    # no TCP port: the SOVD API is only exposed via the Unix socket in the cda-sovd-socket volume
     volumes:
       - ./config/cda/config:/app/config:ro
       - ./config/cda/odx:/app/odx:ro
@@ -348,9 +360,18 @@ services:
         source: spire-agent-vehicle-socket
         target: /tmp/spire-agent/public
         read_only: false
+      - type: volume
+        source: cda-sovd-socket
+        target: /run/cda
+        read_only: false
     hostname: cda
     networks:
       - vehicle-sovd
+    user: "10001:10100"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       spire-agent-vehicle:
         condition: service_started
@@ -360,7 +381,13 @@ services:
       - RUST_LOG=info,cda::spiffe_security_plugin=debug
       - AUTH_REGO_FILE
       - SPIFFE_ENDPOINT_SOCKET=unix:/tmp/spire-agent/public/api.sock
-    command: ["-d", "/app/odx"]
+    command: ["-d", "/app/odx", "--unix-socket", "/run/cda/cda.sock"]
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /run/cda/cda.sock"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 10s
     restart: unless-stopped
   ecu-sim:
     profiles:
