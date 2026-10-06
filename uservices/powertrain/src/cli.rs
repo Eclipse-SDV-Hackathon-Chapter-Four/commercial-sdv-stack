@@ -68,6 +68,24 @@ pub(crate) struct Cli {
         }
     )]
     sovd_powertrain_mode_resource_path: String,
+    /// The resource path on the SOVD server that is used to acquire a lock on the powertrain ECU
+    /// before setting the powertrain mode.
+    /// This value will be appended to the SOVD server's base URI to form the full URL.
+    /// Must be a relative path (i.e. must not start with a slash).
+    #[arg(
+        long,
+        value_name = "PATH",
+        env = "SOVD_POWERTRAIN_LOCK_RESOURCE_PATH",
+        default_value = "components/blueprint-ecu/locks",
+        value_parser = |s: &str| {
+            if s.starts_with('/') {
+                Err(String::from("resource path must be a relative path and must not start with a slash"))
+            } else {
+                Ok(s.to_string())
+            }
+        }
+    )]
+    sovd_powertrain_lock_resource_path: String,
     #[command(flatten)]
     pub opa_config: common::open_policy_agent::OpaConfig,
     #[command(subcommand)]
@@ -95,6 +113,13 @@ impl Cli {
     ) -> Result<url::Url, url::ParseError> {
         self.sovd_server_base_uri
             .join(&self.sovd_powertrain_mode_resource_path)
+    }
+
+    pub(crate) fn get_sovd_powertrain_lock_resource_url(
+        &self,
+    ) -> Result<url::Url, url::ParseError> {
+        self.sovd_server_base_uri
+            .join(&self.sovd_powertrain_lock_resource_path)
     }
 
     pub(crate) fn get_local_uri_provider(

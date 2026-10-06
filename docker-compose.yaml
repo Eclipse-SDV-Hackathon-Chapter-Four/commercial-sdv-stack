@@ -337,7 +337,7 @@ services:
       args:
         - SOURCE_DATE_EPOCH=0
         # the SHA of the git ref we use in uservices/cda/Cargo.toml
-        - SOURCE_GIT_SHA=99c60782a6e25f6cff9ba3a3418d0750f936016e
+        - SOURCE_GIT_SHA=58f0c9044e2585d5dd264a980935c43d3c921250
     ports:
       - "${CDA_PORT:-20002}:20002"
     volumes:
