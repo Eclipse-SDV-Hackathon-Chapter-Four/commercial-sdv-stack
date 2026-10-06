@@ -101,20 +101,46 @@ Override via environment variables (see `src/lib.rs`): `STACK_DIR`, `CDA_BASE`,
 | --- | --- | --- | --- |
 | 1 | Authorized read | `powertrain-mode-controller`, aud `sovd.cda` | **ALLOW** (2xx) |
 | 2 | Authorized write | `powertrain-mode-controller`, aud `sovd.cda` | **ALLOW** (2xx) |
-| 3 | Registered but forbidden identity | `vehicle/properties` (no allow-list entry) | **DENY** (403) |
-| 4 | Unknown SPIFFE ID | `vehicle/intruder` (unregistered) | **DENY** (403) |
-| 5 | Wrong JWT audience | correct id, aud `wrong.audience` | **DENY** (401) |
+| 3 | Forbidden identity (not in allow-list) | `vehicle/properties` (no allow-list entry) | **DENY** (403) |
+| 4 | Unknown SPIFFE ID (not in allow-list) | `vehicle/intruder` (not allow-listed) | **DENY** (403) |
+| 5 | Wrong JWT audience | correct id, aud `wrong.audience` | **DENY** (403) |
 | 6 | Expired JWT | correct id, `ttl 2s`, wait `>60s` (leeway) | **DENY** (403) |
 | 7 | Missing token | *(no Authorization header)* | **DENY** (401) |
 | 8 | Tampered signature | valid token, middle sig byte flipped | **DENY** (403) |
-| 9 | `alg:none` forged token | unsigned algorithm-confusion token | **DENY** (401) |
+| 9 | `alg:none` forged token | unsigned algorithm-confusion token | **DENY** (403) |
 | 10 | Multi-audience token | aud `[sovd.cda, other.service]` | **ALLOW** (2xx) — audience is *contains*, not *equals* |
 
 The suite classifies any `2xx` as **ALLOW** and any `401`/`403` as **DENY** (a `2xx` on a
-deny row is a security hole and fails; a `5xx`/unreachable also fails). The exact
-`401`-vs-`403` split above reflects the code paths (401 = authentication/token failure,
-403 = Rego authorization denial); the pass/fail logic does not depend on which of the two
-a deny returns.
+deny row is a security hole and fails; a `4xx` other than `401`/`403` — e.g. a `404` from a
+wrong resource path — also fails, as does a `5xx`/unreachable). The code split is **not** a
+clean authn-vs-authz boundary: the CDA maps *every* token failure — wrong audience, bad
+signature, expired, `alg:none` — through one `InvalidToken` path returning **403**. Only a
+**missing** token returns **401** (`NoTokenProvided`). The suite asserts `401` exactly for
+the missing-token case (guarding authenticate-before-authorize) and accepts `401` or `403`
+for the other deny rows.
+
+**On the `401`-vs-`403` codes** (verified against the live stack): only a **missing** token
+returns `401`. *Every* token-validation failure — wrong audience, bad/tampered signature,
+expired, `alg:none` — is reported by the CDA as **`403`** (`"Invalid token: Token
+validation failed"`), as is a Rego authorization denial (`"not authorized to invoke
+service"`). So the code alone does not distinguish an authentication failure from an
+authorization denial; both surface as `403`. See `cda/src/spiffe_security_plugin.rs`:
+`NoTokenProvided` → `401`, while `InvalidToken` and the OPA `AccessDenied` path → `403`.
+
+> **Resource resolution happens before the Rego check.** The CDA authenticates the token
+> first, then resolves the requested diagnostic service, then runs OPA. A request for a
+> **non-existent** resource path therefore returns `404` *before* authorization runs — even
+> for a forbidden identity. The DENY rows above depend on `PWT_DATA_PATH` resolving to a
+> real diagnostic service; a stale/wrong path would make those rows return `404` and the
+> suite would **fail loudly** (`404 ∉ {401,403}`), not pass spuriously.
+
+> **Rows 3 and 4 exercise the same enforcement branch.** Because tokens are admin-minted
+> (attestation bypassed), the CDA cannot tell a *registered* identity (`vehicle/properties`,
+> which has a real SPIRE entry) from an *unregistered* one (`vehicle/intruder`): neither
+> appears in `allowed_services`, so both are denied by the identical OPA rule. These rows
+> prove "any SPIFFE ID not on the allow-list is denied" — they do **not** prove the
+> registered-vs-unregistered distinction. That distinction is a property of **attestation**
+> and is covered by the `modified_image_gets_no_identity` stateful test below.
 
 ### Observed behaviours (verified against the live stack)
 
@@ -141,63 +167,42 @@ scripts/register_workloads.sh                                        # register 
 The `cargo test` summary is the money shot: one `#[test]` per guarantee, all green,
 non-zero exit on any regression.
 
-## Not yet automated
+## Stateful tests (attestation & offline) — run deliberately
 
-These scenarios from issue #8 are **documented manual procedures** here; they mutate
-container/stack state (stopping SPIRE, launching rogue containers) and are better run
-deliberately than in the core matrix. Good candidates for a follow-up `cases/` expansion.
-
-### Attestation — a modified image cannot obtain the expected identity
-
-SPIRE attests workloads by **Docker image id *and* the `UP_LOCAL_ADDRESS` env selector**
-(see `scripts/register_workloads.sh`). A container that is not the registered image — or
-has the wrong env — gets no SVID:
+These scenarios from issue #8 mutate the running stack (launch a rogue container,
+stop/start `spire-server`), so they live in `tests/offline.rs` and are `#[ignore]`d —
+excluded from the default `cargo test`. A global lock serializes them and a Drop guard
+always restarts `spire-server`, so a failure can't leave it stopped. Run with the stack
+up:
 
 ```bash
-# Launch a rogue container sharing the vehicle agent's Workload API socket:
-docker run --rm -it \
-  -v commercial-sdv-stack_spire-agent-vehicle-socket:/tmp/spire-agent/public \
-  ghcr.io/spiffe/spire-agent:1.15.3 \
-  api fetch jwt -audience sovd.cda \
-  -socketPath /tmp/spire-agent/public/api.sock
-# Expected: no SVID returned — the image id is not a registered selector.
+cargo test --test offline -- --ignored --test-threads=1
+# or:  ./run.sh --ignored --test-threads=1
 ```
 
-### Offline behavior — backend SPIRE unavailable
+| Test | Scenario | Expected |
+| --- | --- | --- |
+| `modified_image_gets_no_identity` | Rogue container (unregistered Docker image) shares the vehicle agent socket and asks for a JWT-SVID | `PermissionDenied: no identity issued` — no SVID |
+| `offline_cached_accepted_expired_rejected` | `spire-server` stopped; a pre-minted still-valid token vs. an expired one | cached valid → **ALLOW**; expired → **DENY** (fails securely) |
 
-```bash
-# Mint a short-lived and a longer-lived token BEFORE going offline:
-docker compose exec -T spire-server /opt/spire/bin/spire-server jwt mint \
-  -socketPath /run/spire/server/private/api.sock \
-  -spiffeID spiffe://sdv.eclipse.org/vehicle/powertrain-mode-controller \
-  -audience sovd.cda -ttl 300s           # cached valid credential
-# ...and one with -ttl 5s for the "expired" case.
+The attestation test proves SPIRE's dual selector (**Docker image id + `UP_LOCAL_ADDRESS`
+env**, see `scripts/register_workloads.sh`): an image that isn't a registered selector
+gets no identity. The offline test proves the agent validates cached credentials against
+its cached JWT bundle while the backend is down, yet still rejects expired ones — and new
+SVID issuance is impossible until the server returns.
 
-docker compose stop spire-server          # backend SPIRE unavailable
-
-# Cached valid credential -> still ALLOW: the agent validates against its cached JWT
-# bundle (public keys) without the server.
-curl -s -o /dev/null -w '%{http_code}\n' \
-  -H "Authorization: Bearer <valid-token>" \
-  http://localhost:20002/vehicle/v15/components/blueprint-ecu/data/powertrain_mode
-
-# Expired credential -> DENY: fails securely even while offline.
-# New SVID issuance is impossible while the server is down (JWT-SVIDs are fetched
-# from the server on demand, not minted by the agent).
-
-docker compose start spire-server         # connectivity returns -> issuance resumes
-```
-
-**Characterization notes to capture during the demo:**
+**Characterization notes:**
 
 - **JWT-SVID lifetime** — minted TTLs are capped by the server (observe the
-  `JWT-SVID lifetime was capped…` notice); tokens are usable until their `exp`.
-- **Server restart invalidates all JWTs** — `spire-server` uses an **in-memory**
-  `KeyManager` (`config/spire/server/server.conf`), so restarting it rotates the JWT
-  signing key and **all previously issued JWTs stop validating**. Agents use a **disk**
-  `KeyManager` and recover their own identity without re-attestation. This is a real
-  design decision worth surfacing: switch the server to a persistent `KeyManager` if
-  tokens must survive a backend restart.
+  `JWT-SVID lifetime was capped…` notice); tokens are usable until their `exp` (plus the
+  ~60s leeway above).
+- **A `spire-server` *restart* does NOT invalidate existing tokens.** The JWT signing
+  keys are managed by an in-memory `KeyManager`, but their public halves are persisted in
+  the server's SQLite datastore (which survives a `docker compose restart`) and retained
+  in the published bundle for the rotation-overlap window. Previously issued tokens
+  therefore keep validating until their own `exp`. Only recreating the server
+  (`down`/`up`, wiping the ephemeral datastore) rotates the trust material — verified: an
+  old token was still accepted 60s after a restart.
 
 ## Layout
 

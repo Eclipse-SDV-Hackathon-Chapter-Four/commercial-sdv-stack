@@ -175,14 +175,77 @@ pub fn request(method: Method, path: &str, token: Option<&str>, body: Option<&st
     rb.send().map(|r| r.status().as_u16()).unwrap_or(0)
 }
 
-/// Force variant detection once, so reads/writes resolve an ECU variant.
-/// Best-effort: failures here are environmental, not authorization failures.
+/// Best-effort trigger of ECU variant detection so reads/writes resolve a
+/// variant. The result is intentionally ignored: the CDA caches variant
+/// detection globally, so this is usually a no-op. If a variant genuinely
+/// cannot be resolved, reads/writes return 404 and the ALLOW tests fail loudly
+/// (never a silent pass), so this helper is a convenience, not a guarantee.
 pub fn ensure_variant() {
     static VARIANT: Once = Once::new();
     VARIANT.call_once(|| {
         let token = mint_jwt(&spiffe_pmc(), &aud_cda(), "120s");
         let _ = request(Method::PUT, "components/blueprint-ecu", Some(&token), None);
     });
+}
+
+// ---------------------------------------------------------------------------
+// Stack control (used by the #[ignore]d stateful tests in offline.rs)
+// ---------------------------------------------------------------------------
+
+use std::process::Output;
+
+/// Run `docker compose <args>` in the stack directory.
+pub fn compose(args: &[&str]) -> Output {
+    let mut cmd = Command::new("docker");
+    cmd.current_dir(stack_dir()).arg("compose").args(args);
+    cmd.output().expect("failed to run docker compose")
+}
+
+pub fn spire_stop() {
+    let _ = compose(&["stop", "spire-server"]);
+}
+pub fn spire_start() {
+    let _ = compose(&["start", "spire-server"]);
+}
+
+/// Block until spire-server can mint again (i.e. it is back up). Panics on timeout.
+pub fn wait_spire_ready(max_secs: u64) {
+    for _ in 0..max_secs {
+        if !mint_jwt(&spiffe_pmc(), &aud_cda(), "60s").is_empty() {
+            return;
+        }
+        std::thread::sleep(Duration::from_secs(1));
+    }
+    panic!("spire-server did not become ready within {max_secs}s");
+}
+
+/// Name of the vehicle SPIRE agent's Workload API socket volume.
+pub fn vehicle_socket_volume() -> String {
+    let out = Command::new("docker")
+        .args(["volume", "ls", "--format", "{{.Name}}"])
+        .output()
+        .expect("docker volume ls");
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .find(|l| l.ends_with("spire-agent-vehicle-socket"))
+        .unwrap_or("commercial-sdv-stack_spire-agent-vehicle-socket")
+        .to_string()
+}
+
+/// Try to fetch a JWT-SVID from a rogue container (an unregistered image) that
+/// shares the vehicle agent's Workload API socket. A workload whose Docker
+/// image id is not a registered selector gets no identity.
+pub fn rogue_jwt_fetch(audience: &str) -> Output {
+    let mount = format!("{}:/tmp/spire-agent/public", vehicle_socket_volume());
+    Command::new("docker")
+        .arg("run")
+        .args(["--rm", "--entrypoint", "/opt/spire/bin/spire-agent"])
+        .args(["-v", &mount])
+        .arg("ghcr.io/spiffe/spire-agent:1.15.3")
+        .args(["api", "fetch", "jwt", "-audience", audience])
+        .args(["-socketPath", "/tmp/spire-agent/public/api.sock"])
+        .output()
+        .expect("failed to run rogue spire-agent")
 }
 
 // ---------------------------------------------------------------------------
@@ -195,4 +258,12 @@ pub fn assert_allow(label: &str, code: u16) {
 
 pub fn assert_deny(label: &str, code: u16) {
     assert!(code == 401 || code == 403, "{label}: expected DENY (401/403), got {code}");
+}
+
+/// Assert a request was rejected specifically as *unauthenticated* (exactly 401).
+/// Only a MISSING token yields 401; every other token failure (bad audience, bad
+/// signature, expired, alg:none) maps to 403. Asserting 401 here guards the
+/// authentication-before-authorization ordering.
+pub fn assert_unauthenticated(label: &str, code: u16) {
+    assert_eq!(code, 401, "{label}: expected 401 Unauthenticated, got {code}");
 }

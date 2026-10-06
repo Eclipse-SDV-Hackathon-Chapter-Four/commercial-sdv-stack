@@ -40,12 +40,20 @@ docker run --rm \
   -v "$CARGO_CACHE_VOL":/usr/local/cargo/registry \
   "$RUST_IMAGE" cargo test --no-run
 
-# The container writes to the bind-mounted target/; pick the freshest test binary.
-bin="$(ls -t "$SCRIPT_DIR"/target/debug/deps/authorization-* 2>/dev/null | grep -v '\.d$' | head -1 || true)"
-if [ -z "$bin" ]; then
-  echo "[run.sh] could not locate the compiled test binary under target/debug/deps/" >&2
+# The container writes to the bind-mounted target/; run each test binary (newest
+# build of each) on the host. Default run executes only authorization (offline's
+# tests are #[ignore]d); pass `--ignored --test-threads=1` to run the stateful set.
+rc=0
+found=
+for name in authorization offline; do
+  bin="$(ls -t "$SCRIPT_DIR"/target/debug/deps/${name}-* 2>/dev/null | grep -v '\.d$' | head -1 || true)"
+  [ -n "$bin" ] || continue
+  found=1
+  echo "[run.sh] Running ${name} on host (STACK_DIR=$STACK_DIR)"
+  env STACK_DIR="$STACK_DIR" "$bin" "$@" || rc=1
+done
+if [ -z "$found" ]; then
+  echo "[run.sh] could not locate any compiled test binary under target/debug/deps/" >&2
   exit 1
 fi
-
-echo "[run.sh] Running $(basename "$bin") on host (STACK_DIR=$STACK_DIR)"
-exec env STACK_DIR="$STACK_DIR" "$bin" "$@"
+exit "$rc"
