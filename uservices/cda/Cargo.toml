@@ -19,7 +19,7 @@ edition = { workspace = true }
 [dependencies]
 # opensovd cda dependencies
 # AI-modified (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
-# hackathon fork: Unix domain socket support is not yet available upstream
+# hackathon fork of upstream; this revision includes the SOVD server Unix domain socket support
 cda-database = { git = "https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git", rev = "58f0c9044e2585d5dd264a980935c43d3c921250" }
 cda-interfaces = { git = "https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git", rev = "58f0c9044e2585d5dd264a980935c43d3c921250" }
 cda-plugin-security = { git = "https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git", rev = "58f0c9044e2585d5dd264a980935c43d3c921250" }
