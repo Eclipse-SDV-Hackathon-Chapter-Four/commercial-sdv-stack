@@ -9,6 +9,10 @@ terms of the Apache License Version 2.0 which is available at
 https://www.apache.org/licenses/LICENSE-2.0
 
 SPDX-License-Identifier: Apache-2.0
+
+AI assistance: parts of this file were generated with Claude Code (Opus 4.8)
+and reviewed and verified by the human contributor. All content is
+contributed under the Apache-2.0 license declared above.
 -->
 
 # Integration Tests — Authorization Guarantees
