@@ -48,6 +48,7 @@ COPY --from=builder --chmod=755 /home/rust/cda/entrypoint.sh /app/entrypoint.sh
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 RUN mkdir -p /app/odx
 
+# AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
 # Non-root CDA user; clients of the SOVD Unix socket must be members of the sovd-clients group
 RUN groupadd --gid 10100 sovd-clients \
     && useradd --uid 10001 --gid 10100 --no-create-home --shell /usr/sbin/nologin cda \
@@ -56,5 +57,6 @@ RUN groupadd --gid 10100 sovd-clients \
     && chmod 0750 /run/cda
 
 USER 10001:10100
+# AI-generated - issue 7: end
 
 ENTRYPOINT ["/app/entrypoint.sh"]
