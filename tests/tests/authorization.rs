@@ -54,6 +54,10 @@ fn registered_but_forbidden_identity_is_denied() {
 
 #[test]
 fn unknown_spiffe_id_is_denied() {
+    // NB: both this and registered_but_forbidden_identity are admin-minted, which
+    // bypasses attestation, so at the CDA they exercise the SAME "not in the OPA
+    // allow-list -> 403" branch. The registered-vs-unregistered *attestation*
+    // distinction is covered by modified_image_gets_no_identity in offline.rs.
     let token = mint_jwt(&spiffe_unknown(), &aud_cda(), "300s");
     assert_deny("unknown SPIFFE ID", request(Method::GET, &pwt_path(), Some(&token), None));
 }
@@ -75,7 +79,9 @@ fn expired_token_is_denied() {
 
 #[test]
 fn missing_token_is_denied() {
-    assert_deny("missing token", request(Method::GET, &pwt_path(), None, None));
+    // A missing token is the one case that returns 401 (NoTokenProvided); every
+    // other token failure maps to 403. Assert the exact code to guard ordering.
+    assert_unauthenticated("missing token", request(Method::GET, &pwt_path(), None, None));
 }
 
 // --- Token hardening (forged credentials) ---------------------------------
