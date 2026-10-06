@@ -1,0 +1,12 @@
+# define digest expected for the appoved workloads in sdv blueprint
+# in production this file could be signed by CI pipeline at image release time
+# to get digest run docker image inspect -f '{{.Id}}' ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/powertrain-mode-controller:latest
+
+
+# spiffe_id                                              approved image digest
+spiffe://sdv.eclipse.org/vehicle/powertrain-mode-controller  sha256:7f1459ff730d80f4528ff82ea0ef6fbe1ab04974d8fd0165a3b260de26e5438a
+spiffe://sdv.eclipse.org/vehicle/properties                  sha256:c0e536433f6607d7629f7fabe9a1cb5adb59b3b91a7d58ba4eaf7c754d0f35ed
+spiffe://sdv.eclipse.org/backend/fms                         sha256:9884f95f7677743e9bc8120f4371dcf89cb9efc6fdd2b949218480c8dc120530
+
+
+
