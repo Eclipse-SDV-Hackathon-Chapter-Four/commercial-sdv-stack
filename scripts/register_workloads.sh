@@ -18,14 +18,14 @@
 #  Approves the locally built workload images and registers them with the
 #  SPIRE server.
 #
-#  Generating the approved-workloads.list here simulates the step an OEM's
+#  Generating the approved-workloads.yaml here simulates the step an OEM's
 #  release pipeline would perform (and sign) at image release time. The
 #  registration below then consumes that list, mirroring how a deployment
 #  host would enforce a pipeline-provided allowlist in production.
 
 set -euo pipefail
 
-APPROVED_FILE="$(dirname "$0")/../config/spire/approved-workloads.list"
+APPROVED_FILE="$(dirname "$0")/../config/spire/approved-workloads.yaml"
 
 #  The workload inventory: SPIFFE ID, image, and compose service name.
 #  The zone (vehicle/backend) in the SPIFFE ID selects the SPIRE agent.
@@ -49,8 +49,7 @@ spire_server() {
   echo "# In production this file would be produced and signed by the OEM's"
   echo "# release pipeline at image release time; generating it here simulates"
   echo "# that approval step for the blueprint."
-  echo "#"
-  echo "# spiffe_id  approved_image_config_digest  compose_service"
+  echo "workloads:"
 } > "$APPROVED_FILE"
 
 for workload in "${WORKLOADS[@]}"; do
@@ -60,7 +59,11 @@ for workload in "${WORKLOADS[@]}"; do
     exit 1
   fi
   echo "approving $spiffe_id -> $digest"
-  printf '%-60s %s %s\n' "$spiffe_id" "$digest" "$service" >> "$APPROVED_FILE"
+  {
+    printf '  - spiffe_id: "%s"\n' "$spiffe_id"
+    printf '    image_config_digest: "%s"\n' "$digest"
+    printf '    compose_service: "%s"\n' "$service"
+  } >> "$APPROVED_FILE"
 done
 
 #  Remove existing registrations
@@ -70,10 +73,21 @@ spire_server entry show | awk '/^Entry ID/ {print $4}' | while read -r id; do
   spire_server entry delete -entryID "$id" >/dev/null
 done
 
-#  Register the approved workloads with the SPIRE server
-while read -r -u 3 spiffe_id digest service || [[ -n "$spiffe_id" ]]; do
-  [[ -z "$spiffe_id" || "$spiffe_id" == \#* ]] && continue
+#  Flatten the approved workloads YAML into "spiffe_id digest service" lines.
+#  Only the simple structure written above is supported (no yq dependency).
+parse_approved() {
+  awk '
+    function val(s) { sub(/^[^:]*:[ \t]*/, "", s); gsub(/^"|"$/, "", s); return s }
+    /^[ \t]*#/ { next }
+    /^[ \t]*-?[ \t]*spiffe_id:/           { id = val($0) }
+    /^[ \t]*-?[ \t]*image_config_digest:/ { dg = val($0) }
+    /^[ \t]*-?[ \t]*compose_service:/     { sv = val($0) }
+    id != "" && dg != "" && sv != ""      { print id, dg, sv; id = dg = sv = "" }
+  ' "$1"
+}
 
+#  Register the approved workloads with the SPIRE server
+while read -r -u 3 spiffe_id digest service; do
   zone=$(echo "$spiffe_id" | cut -d/ -f4)
   case "$zone" in
     backend) agent=spire-agent-backend ;;
@@ -98,4 +112,4 @@ while read -r -u 3 spiffe_id digest service || [[ -n "$spiffe_id" ]]; do
       echo "         an SVID until recreated (docker compose up -d $service)" >&2
     fi
   fi
-done 3< "$APPROVED_FILE"
+done 3< <(parse_approved "$APPROVED_FILE")

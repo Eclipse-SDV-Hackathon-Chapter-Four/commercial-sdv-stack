@@ -77,7 +77,7 @@ that identity may do.
 The top-level [README](../../README.md) documents how to start the Compose
 profiles and run `scripts/register_workloads.sh`. The script resolves each
 local image's **config digest** (the value used by the Docker attestor), writes
-`approved-workloads.list`, and registers the digest under the appropriate
+`approved-workloads.yaml`, and registers the digest under the appropriate
 backend or vehicle agent. It also warns when a running container has a
 different digest. The list is generated data; the script's `WORKLOADS` array is
 the inventory to change when services are added or renamed.
