@@ -1,0 +1,21 @@
+#!/usr/sbin/nft -f
+# SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+# SPDX-License-Identifier: Apache-2.0
+# AI-generated (GitHub Copilot, Claude Opus 5.5) - i.MX95 Wi-Fi MQTT
+# installed as /etc/sdv-wifi-firewall.nft; root has an empty password, so SSH must never be reachable over Wi-Fi
+
+table inet sdv_wifi
+delete table inet sdv_wifi
+
+table inet sdv_wifi {
+	chain input {
+		type filter hook input priority filter; policy accept;
+		iifname != "mlan0" accept
+		ct state established,related accept
+		udp sport 67 udp dport 68 accept
+		meta l4proto { icmp, ipv6-icmp } accept
+		udp dport 5353 accept
+		tcp dport 1883 accept
+		counter drop
+	}
+}

@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+# SPDX-License-Identifier: Apache-2.0
+# AI-generated (GitHub Copilot, Claude Opus 5.5) - i.MX95 Wi-Fi MQTT
+
+[Unit]
+Description=Wi-Fi firewall (only DHCP, ICMP, mDNS and MQTT on mlan0)
+DefaultDependencies=no
+After=local-fs.target
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/sdv-wifi-firewall.nft
+ExecStop=/usr/sbin/nft delete table inet sdv_wifi
+
+[Install]
+WantedBy=multi-user.target
