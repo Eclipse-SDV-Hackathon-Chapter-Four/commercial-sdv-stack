@@ -32,6 +32,7 @@ on:
     branches:
       - main
       - hackathon
+  workflow_call:
 
 env:
   RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}

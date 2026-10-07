@@ -19,11 +19,6 @@ name: CI
 
 on:
   workflow_dispatch:
-  # TEMPORARY: fires a run on this branch so the workflow can be exercised
-  # before it reaches the default branch. Remove before merging.
-  push:
-    branches:
-    - ci/launch-all-workflows
 
 permissions:
   contents: read
@@ -36,6 +31,10 @@ jobs:
   check-dependencies:
     name: Check 3rd party dependencies
     uses: ./.github/workflows/check-dependencies.yaml
+
+  unit-tests:
+    name: Unit tests
+    uses: ./.github/workflows/unit_tests.yaml
 
   authorization-tests:
     name: Authorization integration tests
