@@ -20,11 +20,10 @@
 //! Stateful attestation & offline tests.
 //!
 //! These mutate the running stack (launch a rogue container, stop/start
-//! spire-server), so they are `#[ignore]`d and excluded from the default
-//! `cargo test`. Run deliberately, serialized, with the stack up:
+//! spire-server), so they are `#[ignore]`d and excluded from the default run.
+//! Run deliberately, serialized, with the stack up:
 //!
-//!   cargo test --test offline -- --ignored --test-threads=1
-//!   # or:  ./run.sh --ignored --test-threads=1
+//!   ./run.sh --include-ignored --test-threads=1
 //!
 //! A global lock serializes them even without `--test-threads=1`, and a Drop
 //! guard restarts spire-server so a failure can't leave it stopped.

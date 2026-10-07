@@ -19,7 +19,7 @@
 
 //! Helpers for the Commercial SDV Stack authorization integration tests.
 //!
-//! The tests drive the CDA SOVD HTTP API (`:20002`) with JWT-SVIDs minted from
+//! The tests drive the CDA SOVD HTTP API (over its Unix domain socket) with JWT-SVIDs minted from
 //! the running `spire-server`, proving that valid attested workloads succeed and
 //! unauthorized / forbidden / expired / forged credentials all fail closed.
 
@@ -69,14 +69,29 @@ pub fn aud_cda() -> String {
 pub fn aud_wrong() -> String {
     env_or("AUD_WRONG", "wrong.audience")
 }
+/// Base URL for the CDA SOVD API. The CDA is exposed only over a Unix domain
+/// socket (see [`cda_socket`]); the HTTP host here is used solely for the `Host`
+/// header, matching the PMC's `SOVD_SERVER_BASE_URI`.
 pub fn cda_base() -> String {
-    env_or("CDA_BASE", format!("http://localhost:{}/vehicle/v15", env_or("CDA_PORT", "20002")))
+    env_or("CDA_BASE", "http://localhost/vehicle/v15")
+}
+/// Path to the CDA SOVD Unix domain socket (shared via the `cda-sovd-socket`
+/// volume). The socket-hardened CDA has no TCP listener, so all requests go
+/// through this socket; the caller must be in the `sovd-clients` group.
+pub fn cda_socket() -> String {
+    env_or("CDA_SOCKET", "/run/cda/cda.sock")
 }
 pub fn pwt_path() -> String {
     env_or("PWT_DATA_PATH", "components/blueprint-ecu/data/powertrain_mode")
 }
 pub fn pwt_write_body() -> String {
     env_or("PWT_WRITE_BODY", r#"{"data":{"Mode":"Economy"}}"#)
+}
+/// SOVD lock resource for the ECU. The socket-hardened CDA requires the caller
+/// to hold a lock to write (a lock-less write returns 409 `lock-required`), so
+/// writes acquire one here first, mirroring the PMC.
+pub fn pwt_lock_path() -> String {
+    env_or("PWT_LOCK_PATH", "components/blueprint-ecu/locks")
 }
 
 /// Seconds to wait past a token's `exp` before the expiry check. SPIRE's JWT
@@ -171,14 +186,21 @@ pub fn tamper(token: &str) -> String {
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
-/// Issue a request to the CDA and return the HTTP status code (0 if unreachable).
+/// A blocking HTTP client bound to the CDA's Unix domain socket (the CDA has no
+/// TCP listener). Mirrors how the PMC talks to the CDA.
+fn cda_client() -> reqwest::blocking::Client {
+    reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .unix_socket(cda_socket())
+        .build()
+        .expect("build http client")
+}
+
+/// Issue a request to the CDA over its Unix domain socket and return the HTTP
+/// status code (0 if unreachable).
 pub fn request(method: Method, path: &str, token: Option<&str>, body: Option<&str>) -> u16 {
     let url = format!("{}/{}", cda_base(), path);
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(15))
-        .build()
-        .expect("build http client");
-    let mut rb = client.request(method, &url);
+    let mut rb = cda_client().request(method, &url);
     if let Some(t) = token {
         rb = rb.bearer_auth(t);
     }
@@ -186,6 +208,43 @@ pub fn request(method: Method, path: &str, token: Option<&str>, body: Option<&st
         rb = rb.header(reqwest::header::CONTENT_TYPE, "application/json").body(b.to_string());
     }
     rb.send().map(|r| r.status().as_u16()).unwrap_or(0)
+}
+
+/// Extract a string field (`"key":"value"`) from a flat JSON body without a
+/// serde dependency. Good enough for the CDA's small lock responses.
+fn json_str_field(body: &str, key: &str) -> Option<String> {
+    let needle = format!("\"{key}\"");
+    let after_key = &body[body.find(&needle)? + needle.len()..];
+    let after_colon = after_key[after_key.find(':')? + 1..].trim_start();
+    let inner = after_colon.strip_prefix('"')?;
+    Some(inner[..inner.find('"')?].to_string())
+}
+
+/// Acquire an exclusive SOVD write lock on the ECU, returning its id. The lock
+/// is scoped to the caller's identity (not the connection). Retries while the
+/// PMC transiently holds the lock (409). Returns None if it can't be acquired.
+pub fn acquire_lock(token: &str) -> Option<String> {
+    let url = format!("{}/{}", cda_base(), pwt_lock_path());
+    for _ in 0..30 {
+        match cda_client()
+            .post(&url)
+            .bearer_auth(token)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(r#"{"lock_expiration":10}"#)
+            .send()
+        {
+            Ok(r) if r.status().as_u16() == 409 => std::thread::sleep(Duration::from_millis(500)),
+            Ok(r) => return r.text().ok().and_then(|t| json_str_field(&t, "id")),
+            Err(_) => std::thread::sleep(Duration::from_millis(500)),
+        }
+    }
+    None
+}
+
+/// Release a previously acquired SOVD lock (best-effort; it also auto-expires).
+pub fn release_lock(token: &str, lock_id: &str) {
+    let url = format!("{}/{}/{}", cda_base(), pwt_lock_path(), lock_id);
+    let _ = cda_client().delete(&url).bearer_auth(token).send();
 }
 
 /// Readiness gate: trigger ECU variant detection and block until an authorized
