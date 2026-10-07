@@ -17,8 +17,9 @@
 # reviewed and verified that the code is correct.
 
 package authz
-
-default allow := false
+# Without this, would return "undefined" in the case of known spiffe_id's.
+# Preferable to always return false.
+default allow := false 
 
 allow if {
     # Check if method ID is allowed for given user.
