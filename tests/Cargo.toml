@@ -26,5 +26,5 @@ license = "Apache-2.0"
 # it never drags in the musl/cross build. It drives the already-running stack.
 
 [dependencies]
-reqwest = { version = "0.12", default-features = false, features = ["blocking"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking"] }
 base64 = "0.22"

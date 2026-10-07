@@ -17,14 +17,15 @@
  * contributed under the Apache-2.0 license declared above.
  */
 
-//! Authorization integration matrix against the CDA SOVD HTTP API.
+//! Authorization integration matrix against the CDA SOVD API (over its Unix socket).
 //!
 //! Prerequisites (see tests/README.md):
 //!   docker compose --profile infra --profile powertrain up -d --build
 //!   scripts/register_workloads.sh
 //!
-//! Run: `cargo test` (from the tests/ crate). The expired-JWT test waits
-//! ~70s past expiry (EXPIRY_WAIT_SECONDS) to clear SPIRE's clock-skew leeway.
+//! Run with `./run.sh` (from the tests/ crate) — the CDA is socket-hardened, so
+//! the tests run in a container that mounts the socket volume. The expired-JWT
+//! test waits ~70s past expiry (EXPIRY_WAIT_SECONDS) to clear SPIRE's leeway.
 
 use std::{thread::sleep, time::Duration};
 
@@ -44,11 +45,13 @@ fn authorized_read_is_allowed() {
 fn authorized_write_is_allowed() {
     ensure_variant();
     let token = mint_jwt(&spiffe_pmc(), &aud_cda(), "300s");
-    let body = pwt_write_body();
-    assert_allow(
-        "authorized write (Powertrain_Mode_Write)",
-        request(Method::PUT, &pwt_path(), Some(&token), Some(&body)),
-    );
+    // The socket-hardened CDA requires a SOVD lock to write (a lock-less PUT is
+    // rejected with 409 `lock-required`), so acquire a lock, write, then release
+    // it -- exactly as the PMC does.
+    let lock = acquire_lock(&token).expect("acquire SOVD write lock");
+    let code = request(Method::PUT, &pwt_path(), Some(&token), Some(&pwt_write_body()));
+    release_lock(&token, &lock);
+    assert_allow("authorized write (Powertrain_Mode_Write)", code);
 }
 
 #[test]

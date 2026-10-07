@@ -31,14 +31,17 @@ against a required audience via the SPIRE Agent Workload API, then apply an
 
 | Enforcement point | Surface | Required audience | Rego decision | Allowed |
 | --- | --- | --- | --- | --- |
-| `sovd-cda` | HTTP `:20002` (SOVD/REST) | `sovd.cda` | `service_name ∈ allowed_services[spiffe_id]` | `…/vehicle/powertrain-mode-controller` → `Powertrain_Mode_Read`, `Powertrain_Mode_Write` |
+| `sovd-cda` | SOVD/REST over a Unix domain socket | `sovd.cda` | `service_name ∈ allowed_services[spiffe_id]` | `…/vehicle/powertrain-mode-controller` → `Powertrain_Mode_Read`, `Powertrain_Mode_Write` |
 | `powertrain-mode-controller` | uProtocol RPC (MQTT) | `powertrain.mode-control` | `method_id ∈ allowed_method_ids[spiffe_id]` | `…/backend/fms` → methods `1`, `2` |
 
-**This suite drives the CDA HTTP enforcement point.** It is the ideal test surface: it
+**This suite drives the CDA SOVD enforcement point.** It is the ideal test surface: it
 exercises *both* the audience check and the Rego check, it is plain HTTP + Bearer token,
 and every scenario can be produced deterministically by minting JWT-SVIDs from the
-running `spire-server`. The uProtocol path uses the identical Rego pattern and is covered
-by the demo flow (see [Not yet automated](#not-yet-automated)).
+running `spire-server`. The CDA is socket-hardened — its SOVD API is exposed only over a
+Unix domain socket reachable by the `sovd-clients` group (no TCP listener) — so the suite
+talks to it over that socket, exactly as the `powertrain-mode-controller` does. The
+uProtocol path uses the identical Rego pattern and is covered by the demo flow (see
+[Not yet automated](#not-yet-automated)).
 
 ### How the matrix is produced
 
@@ -52,7 +55,8 @@ This is a standalone Cargo crate at the **commercial-sdv-stack root** (`tests/`)
 to `docker-compose.yaml`. It is deliberately **not** a member of the `uservices`
 workspace, so it never pulls in the musl/cross build — it just drives the running stack.
 The crate shells out to `docker compose exec spire-server ...` to mint tokens and uses
-`reqwest` to call the CDA. Override the stack location with `STACK_DIR=...` if needed.
+`reqwest` (over the CDA's Unix domain socket) to call the CDA. Override the stack location
+with `STACK_DIR=...` if needed.
 
 ## Prerequisites
 
@@ -66,38 +70,37 @@ docker compose --profile infra --profile powertrain up -d --build
 scripts/register_workloads.sh
 ```
 
-Needs a Rust toolchain (`cargo`) plus a running `docker` daemon. The suite reaches the
-CDA at `http://localhost:20002`.
+Needs a running `docker` daemon. Because the CDA is reachable only over a Unix domain
+socket owned by the `sovd-clients` group, the suite runs **inside a container** that joins
+that group and mounts the socket volume — so there is no host `cargo`/`:20002` dependency.
 
 ## Running
 
-```bash
-cd tests
-cargo test                  # runs the whole matrix; exit code non-zero on any failure
-cargo test -- --nocapture   # see per-test detail
-```
-
-No local Rust toolchain? Use the wrapper — it compiles the test binary in a Rust
-container and runs it on the host (where `docker` and `localhost:20002` are reachable):
+Use the wrapper from the `tests/` directory. It builds one image (Rust + Docker CLI),
+compiles the test binaries in it, then runs each binary in a container that mounts the
+CDA socket volume, joins the `sovd-clients` group, and mounts the Docker socket (the tests
+mint JWT-SVIDs and drive the stack via `docker compose`):
 
 ```bash
-./run.sh                    # whole matrix
-./run.sh --skip expired     # skip the slow ~70s expiry check
+./run.sh --include-ignored --test-threads=1   # full matrix incl. stateful offline tests
+./run.sh                                       # default matrix (offline tests are #[ignore]d)
+./run.sh --skip expired                        # skip the slow ~70s expiry check
+./run.sh --nocapture                           # see per-test detail
 ```
 
-`cargo test` output is the pass/fail report (one line per `#[test]`, summarised at the
-end) — suitable for CI and presentation. `spire-server` must be running for the suite to
-mint tokens; the CDA must be up for the HTTP checks to pass.
+Output is libtest's pass/fail report (one line per `#[test]`, summarised at the end) —
+suitable for CI and presentation. `spire-server` must be running for the suite to mint
+tokens, and `sovd-cda` must be healthy (its SOVD socket ready) for the checks to pass.
 
 > **Note:** `expired_token_is_denied` sleeps ~70s (past SPIRE's clock-skew leeway, see
-> below). Skip the slow path during quick iteration with
-> `cargo test -- --skip expired`.
+> below). Skip the slow path during quick iteration with `./run.sh --skip expired`.
 
 ### Configuration
 
 Override via environment variables (see `src/lib.rs`): `STACK_DIR`, `CDA_BASE`,
-`CDA_PORT`, `TRUST_DOMAIN`, `SPIFFE_PMC`, `SPIFFE_PROPERTIES`, `SPIFFE_UNKNOWN`,
-`AUD_CDA`, `AUD_WRONG`, `PWT_DATA_PATH`, `EXPIRY_WAIT_SECONDS`.
+`CDA_SOCKET`, `TRUST_DOMAIN`, `SPIFFE_PMC`, `SPIFFE_PROPERTIES`, `SPIFFE_UNKNOWN`,
+`AUD_CDA`, `AUD_WRONG`, `PWT_DATA_PATH`, `EXPIRY_WAIT_SECONDS`, `READINESS_POLL_SECONDS`.
+`run.sh` also honours `SOVD_SOCKET_VOLUME` and `SOVD_CLIENTS_GID` for the socket mount.
 
 ## Expected results
 
