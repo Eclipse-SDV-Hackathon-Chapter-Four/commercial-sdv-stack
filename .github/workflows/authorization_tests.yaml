@@ -67,16 +67,50 @@ jobs:
           docker --version
           docker compose version
 
-      - name: Pull published images
-        # Every uService defines both a build: section and a published
-        # image: ghcr.io/... tag. `docker compose up` would BUILD them from
-        # source (~20 min of Rust/musl compilation); this job tests the
-        # published images, so pull them up front and run with --no-build
-        # below. Keeps CI to an image pull instead of a full build.
-        run: docker compose --profile infra --profile powertrain pull --quiet
+      - name: Set up Docker buildx (container driver for layer cache)
+        # The default docker driver can't import/export build cache; a
+        # docker-container builder can. --load in the build step drops the
+        # finished images into the engine store so the compose up steps below
+        # find them with --no-build.
+        run: |
+          docker buildx create --name ci-builder --driver docker-container --use
+          docker buildx inspect --bootstrap
+
+      - name: Restore Docker build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/.buildx-cache
+          # Key on what changes the image contents; fall back to the newest prior
+          # cache so an unchanged cargo-chef dependency layer is still reused.
+          key: buildx-${{ runner.os }}-${{ hashFiles('uservices/**/Cargo.toml', 'uservices/**/Cargo.lock', 'uservices/**/Dockerfile', 'ecu-sim/**/*.gradle*', 'ecu-sim/docker/Dockerfile') }}
+          restore-keys: |
+            buildx-${{ runner.os }}-
+
+      - name: Build uService images (layer-cached)
+        # The custom uService images are private (not anonymously pullable), so
+        # they must be built here. The Dockerfiles use cargo-chef, so a warm
+        # cache skips recompiling dependencies and only changed app code
+        # rebuilds. Build just the powertrain services (not fw-update's
+        # ecu-updater). First run is cold (~20 min); later runs reuse the cache.
+        run: |
+          docker buildx bake \
+            --file docker-compose.yaml \
+            --set "*.cache-from=type=local,src=/tmp/.buildx-cache" \
+            --set "*.cache-to=type=local,dest=/tmp/.buildx-cache-new,mode=max" \
+            --load \
+            fms vehicle-properties powertrain-mode-controller sovd-cda ecu-sim
+
+      - name: Rotate build cache
+        # buildx local cache grows unbounded otherwise; replace old with new.
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache
+          if [ -d /tmp/.buildx-cache-new ]; then mv /tmp/.buildx-cache-new /tmp/.buildx-cache; fi
 
       - name: Start infra profile
-        run: docker compose --profile infra up -d --no-build --pull never
+        # Images are either pre-built above (--load) or public (pulled on demand);
+        # --no-build prevents a surprise 20-min rebuild if a tag is missing.
+        run: docker compose --profile infra up -d --no-build
 
       - name: Wait for spire-server to accept minting
         run: |
@@ -98,7 +132,7 @@ jobs:
         run: scripts/register_workloads.sh
 
       - name: Start powertrain profile
-        run: docker compose --profile infra --profile powertrain up -d --no-build --pull never
+        run: docker compose --profile infra --profile powertrain up -d --no-build
 
       - name: Wait for the CDA SOVD API to answer
         run: |
