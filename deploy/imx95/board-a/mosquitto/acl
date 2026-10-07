@@ -7,6 +7,12 @@ topic read vehicle/powertrain/mode
 topic readwrite signals/#
 # MXChip AZ3166 (ThreadX) telemetry
 topic readwrite ThreadXAZ3166/#
+# anomaly status published by the anomaly detector
+topic read vehicle/anomaly
 
 user pmc
 topic write vehicle/powertrain/mode
+
+user anomaly-detector
+topic read ThreadXAZ3166/telemetry
+topic write vehicle/anomaly

@@ -13,6 +13,8 @@
 
 [workspace]
 members = [
+    # AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
+    "anomaly-detector",
     "cda",
     "common",
     "fms",
