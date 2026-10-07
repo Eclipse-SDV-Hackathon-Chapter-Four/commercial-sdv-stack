@@ -28,6 +28,8 @@ use up_rust::communication::{
 use crate::cli::Cli;
 
 mod cli;
+// AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
+mod status;
 
 async fn get_rpc_server(cli: cli::Cli) -> Result<InMemoryRpcServer, Box<dyn std::error::Error>> {
     let uri_provider = cli.get_local_uri_provider()?;
@@ -58,6 +60,8 @@ struct CurrentModeController {
     powertrain_lock_url: Url,
     workload_api: WorkloadApiClient,
     authorization_policy: CompiledPolicy,
+    // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
+    status_publisher: Option<status::StatusPublisher>,
 }
 
 impl CurrentModeController {
@@ -76,6 +80,11 @@ impl CurrentModeController {
             // AI-modified - issue 7: end
             workload_api: WorkloadApiClient::connect_env().await?,
             authorization_policy: cli.opa_config.get_compiled_auth_policy()?,
+            // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
+            status_publisher: cli
+                .get_status_publisher_config()
+                .map(status::StatusPublisher::start)
+                .transpose()?,
         })
     }
 
@@ -296,6 +305,10 @@ impl CurrentModeController {
             ))
         } else {
             info!("Powertrain mode set to: {:?}", mode_message.mode);
+            // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
+            if let Some(status_publisher) = &self.status_publisher {
+                status_publisher.publish(mode_message);
+            }
             Ok(None)
         }
     }

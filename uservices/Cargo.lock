@@ -4102,6 +4102,7 @@ dependencies = [
  "common",
  "env_logger",
  "log",
+ "paho-mqtt",
  "regorus",
  "reqwest",
  "serde",

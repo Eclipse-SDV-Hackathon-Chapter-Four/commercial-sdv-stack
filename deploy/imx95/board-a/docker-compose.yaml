@@ -80,6 +80,11 @@ services:
       - SOVD_SERVER_UNIX_SOCKET=/run/cda/cda.sock
       - SOVD_POWERTRAIN_MODE_RESOURCE_PATH=components/blueprint-ecu/data/powertrain_mode
       - SPIFFE_ENDPOINT_SOCKET=unix:/tmp/spire-agent/public/api.sock
+      # AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16: begin
+      - STATUS_MQTT_BROKER_URI=mqtt://127.0.0.1:1883
+      - STATUS_MQTT_USERNAME=pmc
+      - STATUS_MQTT_PASSWORD=${STATUS_MQTT_PASSWORD:-}
+      # AI-generated - issue 16: end
     user: "10002:10100"
     cap_drop:
       - ALL
@@ -112,3 +117,15 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: unless-stopped
+
+  # AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16: begin
+  # status broker for local modules and Wi-Fi clients; the nft firewall only lets MQTT in over Wi-Fi
+  mosquitto:
+    image: eclipse-mosquitto:2
+    network_mode: host
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+      - ./mosquitto/passwd:/mosquitto/config/passwd:ro
+    restart: unless-stopped
+  # AI-generated - issue 16: end

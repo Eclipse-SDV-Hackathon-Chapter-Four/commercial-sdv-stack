@@ -96,6 +96,31 @@ pub(crate) struct Cli {
     )]
     sovd_powertrain_lock_resource_path: String,
     // AI-generated - issue 7: end
+    // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16: begin
+    /// The URI of an MQTT broker to publish the current powertrain mode to (e.g. mqtt://127.0.0.1:1883).
+    /// The mode is not published if not set.
+    #[arg(long, value_name = "URI", env = "STATUS_MQTT_BROKER_URI")]
+    status_mqtt_broker_uri: Option<String>,
+    /// The topic to publish the current powertrain mode to (as a retained message).
+    #[arg(
+        long,
+        value_name = "TOPIC",
+        env = "STATUS_MQTT_TOPIC",
+        default_value = "vehicle/powertrain/mode"
+    )]
+    status_mqtt_topic: String,
+    /// The user name for authenticating to the status MQTT broker.
+    #[arg(long, value_name = "NAME", env = "STATUS_MQTT_USERNAME")]
+    status_mqtt_username: Option<String>,
+    /// The password for authenticating to the status MQTT broker.
+    #[arg(
+        long,
+        value_name = "PASSWORD",
+        env = "STATUS_MQTT_PASSWORD",
+        hide_env_values = true
+    )]
+    status_mqtt_password: Option<String>,
+    // AI-generated - issue 16: end
     #[command(flatten)]
     pub opa_config: common::open_policy_agent::OpaConfig,
     #[command(subcommand)]
@@ -139,6 +164,19 @@ impl Cli {
             .join(&self.sovd_powertrain_lock_resource_path)
     }
     // AI-generated - issue 7: end
+
+    // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16: begin
+    pub(crate) fn get_status_publisher_config(&self) -> Option<crate::status::StatusPublisherConfig> {
+        self.status_mqtt_broker_uri
+            .as_ref()
+            .map(|broker_uri| crate::status::StatusPublisherConfig {
+                broker_uri: broker_uri.clone(),
+                topic: self.status_mqtt_topic.clone(),
+                username: self.status_mqtt_username.clone(),
+                password: self.status_mqtt_password.clone(),
+            })
+    }
+    // AI-generated - issue 16: end
 
     pub(crate) fn get_local_uri_provider(
         &self,
