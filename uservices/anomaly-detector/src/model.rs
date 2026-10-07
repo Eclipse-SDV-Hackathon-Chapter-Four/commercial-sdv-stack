@@ -13,143 +13,15 @@
 
 // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
 
-//! Statistical baseline model: for each operating mode (e.g. a known position of the device) and each
-//! signal, the mean and standard deviation of its level and of the change between consecutive samples,
-//! learned from training data.
+//! Adaptive anomaly detection for the MXChip AZ3166: only acceleration events and large temperature
+//! changes are reported. Each monitored value is compared with a slowly adapting baseline
+//! (exponential moving average), so a new resting position or a slow warm-up becomes the new normal.
 
 use std::{collections::HashMap, str::FromStr};
 
-const MODE_COLUMN: &str = "mode";
-const DEFAULT_MODE: &str = "default";
 const ACCEL_SIGNALS: [&str; 3] = ["accel_x", "accel_y", "accel_z"];
-
-/// Smallest standard deviation used per signal: the sensor's resolution/tolerance, so that a short
-/// recording of a device lying still does not turn every jitter into an anomaly.
-fn min_std(signal: &str) -> f64 {
-    match signal {
-        "pressure" => 0.25,
-        "temperature" => 0.25,
-        "humidity" => 1.0,
-        s if s.starts_with("accel_") || s.starts_with("mag_") => 5.0,
-        _ => 1e-3,
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct SignalModel {
-    pub name: String,
-    pub mean: f64,
-    pub std: f64,
-    pub delta_std: f64,
-}
-
-#[derive(Debug)]
-pub(crate) struct Mode {
-    pub name: String,
-    pub signals: Vec<SignalModel>,
-}
-
-impl Mode {
-    /// Sum of the squared distances (in standard deviations) of the sample from this mode's means.
-    fn distance(&self, sample: &HashMap<&str, f64>) -> f64 {
-        self.signals
-            .iter()
-            .filter_map(|signal| {
-                sample
-                    .get(signal.name.as_str())
-                    .map(|value| ((value - signal.mean) / signal.std).powi(2))
-            })
-            .sum()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Model {
-    pub modes: Vec<Mode>,
-}
-
-impl Model {
-    /// Trains the model from CSV data with a header row naming the signals and one sample per row.
-    /// An optional first column named `mode` assigns each row to an operating mode.
-    pub(crate) fn train_from_csv(csv: &str) -> Result<Self, String> {
-        let mut lines = csv.lines().filter(|line| !line.trim().is_empty());
-        let mut header: Vec<&str> = lines
-            .next()
-            .ok_or("training data is empty")?
-            .split(',')
-            .map(str::trim)
-            .collect();
-        let has_mode_column = header.first() == Some(&MODE_COLUMN);
-        if has_mode_column {
-            header.remove(0);
-        }
-        // rows per mode, in order of first appearance
-        let mut modes: Vec<(String, Vec<Vec<f64>>)> = Vec::new();
-        for (index, line) in lines.enumerate() {
-            let mut values: Vec<&str> = line.split(',').map(str::trim).collect();
-            let mode = if has_mode_column && !values.is_empty() {
-                values.remove(0)
-            } else {
-                DEFAULT_MODE
-            };
-            if values.len() != header.len() {
-                return Err(format!(
-                    "row {}: expected {} values but found {}",
-                    index + 2,
-                    header.len(),
-                    values.len()
-                ));
-            }
-            let row = values
-                .iter()
-                .map(|value| value.parse::<f64>())
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| format!("row {}: {e}", index + 2))?;
-            match modes.iter_mut().find(|(name, _)| name == mode) {
-                Some((_, rows)) => rows.push(row),
-                None => modes.push((mode.to_string(), vec![row])),
-            }
-        }
-        if modes.is_empty() {
-            return Err("training data has no samples".to_string());
-        }
-        let modes = modes
-            .into_iter()
-            .map(|(name, rows)| train_mode(name, &header, &rows))
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(Self { modes })
-    }
-}
-
-fn train_mode(name: String, header: &[&str], rows: &[Vec<f64>]) -> Result<Mode, String> {
-    if rows.len() < 2 {
-        return Err(format!("mode {name}: at least 2 samples are needed"));
-    }
-    let signals = header
-        .iter()
-        .enumerate()
-        .map(|(column, signal)| {
-            let values: Vec<f64> = rows.iter().map(|row| row[column]).collect();
-            let deltas: Vec<f64> = values.windows(2).map(|w| w[1] - w[0]).collect();
-            let (mean, std) = mean_std(&values);
-            let (_, delta_std) = mean_std(&deltas);
-            SignalModel {
-                name: signal.to_string(),
-                mean,
-                std: std.max(min_std(signal)),
-                delta_std: delta_std.max(min_std(signal)),
-            }
-        })
-        .collect();
-    Ok(Mode { name, signals })
-}
-
-fn mean_std(values: &[f64]) -> (f64, f64) {
-    let n = values.len() as f64;
-    let mean = values.iter().sum::<f64>() / n;
-    let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n;
-    (mean, variance.sqrt())
-}
+// shown on the dashboard, but never reported as anomalies
+const OTHER_SIGNALS: [&str; 5] = ["pressure", "humidity", "mag_x", "mag_y", "mag_z"];
 
 /// Parses the AZ3166 telemetry text, e.g. `Pressure: 965.65` or `Acceleration: 4.51, -26.53, 1023.89`
 /// (one line per sensor). Unknown or malformed lines are skipped.
@@ -163,7 +35,7 @@ pub(crate) fn parse_telemetry(payload: &str) -> HashMap<&'static str, f64> {
             "Pressure" => &["pressure"],
             "Temperature" => &["temperature"],
             "Humidity" => &["humidity"],
-            "Acceleration" => &["accel_x", "accel_y", "accel_z"],
+            "Acceleration" => &ACCEL_SIGNALS,
             "Magnetic" => &["mag_x", "mag_y", "mag_z"],
             _ => continue,
         };
@@ -181,14 +53,14 @@ pub(crate) fn parse_telemetry(payload: &str) -> HashMap<&'static str, f64> {
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AnomalyKind {
-    /// The value is far away from the trained mean.
-    OutOfRange,
-    /// The value changed much more since the previous sample than in the training data.
-    SuddenChange,
-    /// Acceleration along the forward axis beyond the event threshold.
+    /// The acceleration differs from the resting baseline (gravity) by more than the threshold.
+    SuddenAcceleration,
+    /// Acceleration along the forward axis beyond the harsh event threshold.
     HarshAcceleration,
-    /// Deceleration along the forward axis beyond the event threshold.
+    /// Deceleration along the forward axis beyond the harsh event threshold.
     HarshBraking,
+    /// The temperature differs from its baseline by more than the threshold.
+    TemperatureChange,
 }
 
 /// The accelerometer axis that points in the vehicle's driving direction, e.g. `+x` or `-y`.
@@ -217,13 +89,19 @@ impl FromStr for ForwardAxis {
     }
 }
 
-/// Detects harsh acceleration and braking from the change along the forward axis compared to the
-/// trained gravity baseline at rest.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct MotionEvents {
+pub(crate) struct Settings {
     pub forward_axis: ForwardAxis,
-    /// Minimum longitudinal acceleration in mg that counts as an event.
-    pub threshold_mg: f64,
+    /// Deviation of the acceleration vector from the resting baseline, in mg (1000 mg = 1 g).
+    pub accel_threshold_mg: f64,
+    /// Longitudinal acceleration along the forward axis for harsh acceleration/braking, in mg.
+    pub harsh_threshold_mg: f64,
+    /// Deviation of the temperature from its baseline, in degrees Celsius.
+    pub temperature_threshold_c: f64,
+    /// Time constant of the acceleration baseline in seconds.
+    pub accel_baseline_secs: f64,
+    /// Time constant of the temperature baseline in seconds.
+    pub temperature_baseline_secs: f64,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -231,166 +109,239 @@ pub(crate) struct Finding {
     pub signal: String,
     pub kind: AnomalyKind,
     pub value: f64,
-    /// Distance in standard deviations.
+    /// Value relative to the threshold (> 1 is an anomaly).
     pub score: f64,
     pub normal_min: f64,
     pub normal_max: f64,
 }
 
-pub(crate) struct Evaluation<'a> {
-    /// The trained mode that matches the sample best.
-    pub mode: &'a str,
-    pub findings: Vec<Finding>,
-    /// The out-of-range limits of the matched mode.
-    pub ranges: Vec<NormalRange>,
+/// A signal's current value and, if it is monitored, its current normal range.
+#[derive(Debug, Clone)]
+pub(crate) struct SignalState {
+    pub name: String,
+    pub value: f64,
+    pub normal: Option<(f64, f64)>,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct NormalRange {
-    pub signal: String,
-    pub min: f64,
-    pub max: f64,
+pub(crate) struct Evaluation {
+    pub findings: Vec<Finding>,
+    pub signals: Vec<SignalState>,
 }
 
 pub(crate) struct Detector {
-    model: Model,
-    level_threshold: f64,
-    change_threshold: f64,
-    motion_events: Option<MotionEvents>,
-    previous: HashMap<String, f64>,
+    settings: Settings,
+    gravity: Option<[f64; 3]>,
+    temperature: Option<f64>,
 }
 
-impl Detector {
-    pub(crate) fn new(
-        model: Model,
-        level_threshold: f64,
-        change_threshold: f64,
-        motion_events: Option<MotionEvents>,
-    ) -> Self {
-        Self {
-            model,
-            level_threshold,
-            change_threshold,
-            motion_events,
-            previous: HashMap::new(),
-        }
-    }
-
-    pub(crate) fn evaluate(&mut self, sample: &HashMap<&str, f64>) -> Evaluation<'_> {
-        let mode = self
-            .model
-            .modes
-            .iter()
-            .min_by(|a, b| a.distance(sample).total_cmp(&b.distance(sample)))
-            .expect("a trained model has at least one mode");
-        let mut findings = Vec::new();
-        for signal in &mode.signals {
-            let Some(&value) = sample.get(signal.name.as_str()) else {
-                continue;
-            };
-            let level_score = (value - signal.mean).abs() / signal.std;
-            if level_score > self.level_threshold {
-                findings.push(Finding {
-                    signal: signal.name.clone(),
-                    kind: AnomalyKind::OutOfRange,
-                    value,
-                    score: round2(level_score),
-                    normal_min: round2(signal.mean - self.level_threshold * signal.std),
-                    normal_max: round2(signal.mean + self.level_threshold * signal.std),
-                });
-            }
-            if let Some(previous) = self.previous.insert(signal.name.clone(), value) {
-                let change_score = (value - previous).abs() / signal.delta_std;
-                if change_score > self.change_threshold {
-                    findings.push(Finding {
-                        signal: signal.name.clone(),
-                        kind: AnomalyKind::SuddenChange,
-                        value,
-                        score: round2(change_score),
-                        normal_min: round2(previous - self.change_threshold * signal.delta_std),
-                        normal_max: round2(previous + self.change_threshold * signal.delta_std),
-                    });
-                }
-            }
-        }
-        if let Some(motion) = self.motion_events {
-            let name = ACCEL_SIGNALS[motion.forward_axis.index];
-            if let (Some(axis), Some(&value)) =
-                (mode.signals.iter().find(|s| s.name == name), sample.get(name))
-            {
-                let longitudinal = motion.forward_axis.sign * (value - axis.mean);
-                // never closer to the noise floor than the out-of-range threshold
-                let threshold = motion.threshold_mg.max(self.level_threshold * axis.std);
-                let kind = if longitudinal > threshold {
-                    Some(AnomalyKind::HarshAcceleration)
-                } else if longitudinal < -threshold {
-                    Some(AnomalyKind::HarshBraking)
-                } else {
-                    None
-                };
-                if let Some(kind) = kind {
-                    findings.push(Finding {
-                        signal: "longitudinal_accel".to_string(),
-                        kind,
-                        value: round2(longitudinal),
-                        score: round2(longitudinal.abs() / threshold),
-                        normal_min: round2(-threshold),
-                        normal_max: round2(threshold),
-                    });
-                }
-            }
-        }
-        Evaluation {
-            mode: &mode.name,
-            findings,
-            ranges: mode
-                .signals
-                .iter()
-                .map(|signal| NormalRange {
-                    signal: signal.name.clone(),
-                    min: round2(signal.mean - self.level_threshold * signal.std),
-                    max: round2(signal.mean + self.level_threshold * signal.std),
-                })
-                .collect(),
-        }
-    }
+/// Weight of a new sample in an exponential moving average with the given time constant.
+fn smoothing(elapsed_secs: f64, time_constant_secs: f64) -> f64 {
+    1.0 - (-elapsed_secs / time_constant_secs).exp()
 }
 
 fn round2(value: f64) -> f64 {
     (value * 100.0).round() / 100.0
 }
 
+fn signal(name: &str, value: f64, normal: Option<(f64, f64)>) -> SignalState {
+    SignalState {
+        name: name.to_string(),
+        value: round2(value),
+        normal: normal.map(|(min, max)| (round2(min), round2(max))),
+    }
+}
+
+impl Detector {
+    pub(crate) fn new(settings: Settings) -> Self {
+        Self {
+            settings,
+            gravity: None,
+            temperature: None,
+        }
+    }
+
+    /// Evaluates a sample received `elapsed_secs` after the previous one.
+    pub(crate) fn evaluate(&mut self, sample: &HashMap<&str, f64>, elapsed_secs: f64) -> Evaluation {
+        let mut findings = Vec::new();
+        let mut signals = Vec::new();
+        self.evaluate_acceleration(sample, elapsed_secs, &mut findings, &mut signals);
+        self.evaluate_temperature(sample, elapsed_secs, &mut findings, &mut signals);
+        for name in OTHER_SIGNALS {
+            if let Some(&value) = sample.get(name) {
+                signals.push(signal(name, value, None));
+            }
+        }
+        Evaluation { findings, signals }
+    }
+
+    fn evaluate_acceleration(
+        &mut self,
+        sample: &HashMap<&str, f64>,
+        elapsed_secs: f64,
+        findings: &mut Vec<Finding>,
+        signals: &mut Vec<SignalState>,
+    ) {
+        let Some(accel) = ACCEL_SIGNALS
+            .iter()
+            .map(|name| sample.get(name).copied())
+            .collect::<Option<Vec<f64>>>()
+        else {
+            return;
+        };
+        let settings = self.settings;
+        // after a long gap (e.g. broker outage) start over instead of comparing with stale data
+        let gravity = match self.gravity {
+            Some(gravity) if elapsed_secs < 3.0 * settings.accel_baseline_secs => gravity,
+            _ => [accel[0], accel[1], accel[2]],
+        };
+        let dynamic: Vec<f64> = accel.iter().zip(gravity).map(|(a, g)| a - g).collect();
+        let magnitude = dynamic.iter().map(|d| d * d).sum::<f64>().sqrt();
+        let longitudinal = settings.forward_axis.sign * dynamic[settings.forward_axis.index];
+
+        if magnitude > settings.accel_threshold_mg {
+            findings.push(Finding {
+                signal: "acceleration".to_string(),
+                kind: AnomalyKind::SuddenAcceleration,
+                value: round2(magnitude),
+                score: round2(magnitude / settings.accel_threshold_mg),
+                normal_min: 0.0,
+                normal_max: settings.accel_threshold_mg,
+            });
+        }
+        let harsh = if longitudinal > settings.harsh_threshold_mg {
+            Some(AnomalyKind::HarshAcceleration)
+        } else if longitudinal < -settings.harsh_threshold_mg {
+            Some(AnomalyKind::HarshBraking)
+        } else {
+            None
+        };
+        if let Some(kind) = harsh {
+            findings.push(Finding {
+                signal: "longitudinal_accel".to_string(),
+                kind,
+                value: round2(longitudinal),
+                score: round2(longitudinal.abs() / settings.harsh_threshold_mg),
+                normal_min: -settings.harsh_threshold_mg,
+                normal_max: settings.harsh_threshold_mg,
+            });
+        }
+
+        signals.push(signal(
+            "acceleration",
+            magnitude,
+            Some((0.0, settings.accel_threshold_mg)),
+        ));
+        signals.push(signal(
+            "longitudinal_accel",
+            longitudinal,
+            Some((-settings.harsh_threshold_mg, settings.harsh_threshold_mg)),
+        ));
+        for (index, name) in ACCEL_SIGNALS.iter().enumerate() {
+            signals.push(signal(
+                name,
+                accel[index],
+                Some((
+                    gravity[index] - settings.accel_threshold_mg,
+                    gravity[index] + settings.accel_threshold_mg,
+                )),
+            ));
+        }
+
+        let weight = smoothing(elapsed_secs, settings.accel_baseline_secs);
+        self.gravity = Some([
+            gravity[0] + weight * dynamic[0],
+            gravity[1] + weight * dynamic[1],
+            gravity[2] + weight * dynamic[2],
+        ]);
+    }
+
+    fn evaluate_temperature(
+        &mut self,
+        sample: &HashMap<&str, f64>,
+        elapsed_secs: f64,
+        findings: &mut Vec<Finding>,
+        signals: &mut Vec<SignalState>,
+    ) {
+        let Some(&value) = sample.get("temperature") else {
+            return;
+        };
+        let settings = self.settings;
+        let baseline = match self.temperature {
+            Some(baseline) if elapsed_secs < 3.0 * settings.temperature_baseline_secs => baseline,
+            _ => value,
+        };
+        let (min, max) = (
+            baseline - settings.temperature_threshold_c,
+            baseline + settings.temperature_threshold_c,
+        );
+        if value < min || value > max {
+            findings.push(Finding {
+                signal: "temperature".to_string(),
+                kind: AnomalyKind::TemperatureChange,
+                value: round2(value),
+                score: round2((value - baseline).abs() / settings.temperature_threshold_c),
+                normal_min: round2(min),
+                normal_max: round2(max),
+            });
+        }
+        signals.push(signal("temperature", value, Some((min, max))));
+        self.temperature = Some(
+            baseline + smoothing(elapsed_secs, settings.temperature_baseline_secs) * (value - baseline),
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const BASELINE: &str = include_str!("../training/az3166-baseline.csv");
-    const POSITION_1: &str = "Pressure: 965.65\nTemperature: 31.16\nHumidity: 47.53\n\
-        Acceleration: 4.51, -26.53, 1023.89\nMagnetic: 616.50, 301.50, 586.50\n";
-    // real telemetry after the device was turned on the desk
-    const POSITION_2: [&str; 3] = [
-        "Pressure: 965.52\nTemperature: 31.51\nHumidity: 48.32\n\
-        Acceleration: 9.76, -18.36, 1021.93\nMagnetic: 421.50, 271.50, -202.50\n",
-        "Pressure: 965.52\nTemperature: 31.50\nHumidity: 48.64\n\
-        Acceleration: 9.70, -18.42, 1020.65\nMagnetic: 412.50, 271.50, -202.50\n",
-        "Pressure: 965.54\nTemperature: 31.48\nHumidity: 48.59\n\
-        Acceleration: 9.58, -18.48, 1019.68\nMagnetic: 412.50, 270.00, -210.00\n",
-    ];
+    // the MXChip publishes every ~5 s
+    const INTERVAL: f64 = 5.0;
+    // real telemetry of the device lying still
+    const RESTING: &str = "Pressure: 965.06\nTemperature: 28.98\nHumidity: 50.02\n\
+        Acceleration: -9.09, -14.34, 1023.15\nMagnetic: 108.00, 216.00, -516.00\n";
 
-    fn detector() -> Detector {
-        Detector::new(
-            Model::train_from_csv(BASELINE).unwrap(),
-            6.0,
-            8.0,
-            Some(MotionEvents {
-                forward_axis: "+x".parse().unwrap(),
-                threshold_mg: 150.0,
-            }),
-        )
+    fn settings() -> Settings {
+        Settings {
+            forward_axis: "+x".parse().unwrap(),
+            accel_threshold_mg: 100.0,
+            harsh_threshold_mg: 150.0,
+            temperature_threshold_c: 3.0,
+            accel_baseline_secs: 60.0,
+            temperature_baseline_secs: 300.0,
+        }
     }
 
-    fn kinds(findings: &[Finding]) -> Vec<AnomalyKind> {
-        findings.iter().map(|f| f.kind).collect()
+    fn with(replace: &str, by: &str) -> HashMap<&'static str, f64> {
+        parse_telemetry(&RESTING.replace(replace, by))
+    }
+
+    fn kinds(evaluation: &Evaluation) -> Vec<AnomalyKind> {
+        evaluation.findings.iter().map(|f| f.kind).collect()
+    }
+
+    fn rested_detector() -> Detector {
+        let mut detector = Detector::new(settings());
+        for _ in 0..12 {
+            detector.evaluate(&parse_telemetry(RESTING), INTERVAL);
+        }
+        detector
+    }
+
+    #[test]
+    fn parses_all_signals() {
+        let sample = parse_telemetry(RESTING);
+        assert_eq!(sample.len(), 9);
+        assert_eq!(sample["pressure"], 965.06);
+        assert_eq!(sample["accel_y"], -14.34);
+        assert_eq!(sample["mag_z"], -516.0);
+    }
+
+    #[test]
+    fn skips_malformed_lines() {
+        let sample = parse_telemetry("Pressure: abc\nAcceleration: 1, 2\nFoo: 1\nHumidity: 50.0");
+        assert_eq!(sample.len(), 1);
+        assert_eq!(sample["humidity"], 50.0);
     }
 
     #[test]
@@ -402,142 +353,104 @@ mod tests {
     }
 
     #[test]
-    fn braking_along_forward_axis_is_detected() {
-        let mut detector = detector();
-        let braking = POSITION_1.replace("4.51, -26.53", "-295.49, -26.53");
-        let findings = detector.evaluate(&parse_telemetry(&braking)).findings;
-        let event = findings.iter().find(|f| f.signal == "longitudinal_accel").unwrap();
-        assert_eq!(event.kind, AnomalyKind::HarshBraking);
-        assert!(event.value < -150.0);
-    }
-
-    #[test]
-    fn acceleration_along_negative_axis_is_detected() {
-        let mut detector = Detector::new(
-            Model::train_from_csv(BASELINE).unwrap(),
-            6.0,
-            8.0,
-            Some(MotionEvents {
-                forward_axis: "-y".parse().unwrap(),
-                threshold_mg: 150.0,
-            }),
-        );
-        let accelerating = POSITION_1.replace("-26.53", "-326.53");
-        let findings = detector.evaluate(&parse_telemetry(&accelerating)).findings;
-        assert!(kinds(&findings).contains(&AnomalyKind::HarshAcceleration));
-    }
-
-    #[test]
-    fn small_push_is_not_a_harsh_event() {
-        let mut detector = detector();
-        let push = POSITION_1.replace("4.51, -26.53", "104.51, -26.53");
-        let findings = detector.evaluate(&parse_telemetry(&push)).findings;
-        assert!(!kinds(&findings).contains(&AnomalyKind::HarshAcceleration));
-        assert!(!kinds(&findings).contains(&AnomalyKind::HarshBraking));
-    }
-
-    #[test]
-    fn parses_all_signals() {
-        let sample = parse_telemetry(POSITION_1);
-        assert_eq!(sample.len(), 9);
-        assert_eq!(sample["pressure"], 965.65);
-        assert_eq!(sample["accel_y"], -26.53);
-        assert_eq!(sample["mag_z"], 586.5);
-    }
-
-    #[test]
-    fn skips_malformed_lines() {
-        let sample = parse_telemetry("Pressure: abc\nAcceleration: 1, 2\nFoo: 1\nHumidity: 50.0");
-        assert_eq!(sample.len(), 1);
-        assert_eq!(sample["humidity"], 50.0);
-    }
-
-    #[test]
-    fn trains_all_modes_and_signals_from_baseline() {
-        let model = Model::train_from_csv(BASELINE).unwrap();
-        let names: Vec<&str> = model.modes.iter().map(|m| m.name.as_str()).collect();
-        assert_eq!(names, ["position_1", "position_2"]);
-        for mode in &model.modes {
-            assert_eq!(mode.signals.len(), 9);
-            assert!(mode.signals.iter().all(|s| s.std > 0.0 && s.delta_std > 0.0));
-        }
-    }
-
-    #[test]
-    fn trains_without_mode_column() {
-        let model = Model::train_from_csv("a,b\n1,2\n3,4\n").unwrap();
-        assert_eq!(model.modes.len(), 1);
-        assert_eq!(model.modes[0].name, DEFAULT_MODE);
-    }
-
-    #[test]
-    fn rejects_inconsistent_training_data() {
-        assert!(Model::train_from_csv("a,b\n1,2\n3\n").is_err());
-        assert!(Model::train_from_csv("mode,a\nx,1\n").is_err());
-        assert!(Model::train_from_csv("a,b\n").is_err());
-        assert!(Model::train_from_csv("").is_err());
-    }
-
-    #[test]
-    fn both_known_positions_are_normal() {
-        let mut detector = detector();
-        let evaluation = detector.evaluate(&parse_telemetry(POSITION_1));
-        assert_eq!(evaluation.mode, "position_1");
+    fn first_sample_is_normal() {
+        let mut detector = Detector::new(settings());
+        let evaluation = detector.evaluate(&parse_telemetry(RESTING), INTERVAL);
         assert!(evaluation.findings.is_empty());
+        assert_eq!(evaluation.signals.len(), 2 + 9);
+    }
 
-        let mut detector = self::detector();
-        for telemetry in POSITION_2 {
-            let evaluation = detector.evaluate(&parse_telemetry(telemetry));
-            assert_eq!(evaluation.mode, "position_2");
-            assert!(evaluation.findings.is_empty(), "{:?}", evaluation.findings);
+    #[test]
+    fn sensor_jitter_is_normal() {
+        let mut detector = rested_detector();
+        let jitter = with("-9.09, -14.34, 1023.15", "-9.15, -14.21, 1021.75");
+        assert!(detector.evaluate(&jitter, INTERVAL).findings.is_empty());
+    }
+
+    #[test]
+    fn small_tilt_is_normal() {
+        let mut detector = rested_detector();
+        // about 4 degrees, as during the 5 minute recording
+        let tilted = with("-9.09, -14.34", "-9.09, -79.00");
+        assert!(detector.evaluate(&tilted, INTERVAL).findings.is_empty());
+    }
+
+    #[test]
+    fn new_resting_position_becomes_normal() {
+        let mut detector = rested_detector();
+        let turned = with("-9.09, -14.34, 1023.15", "-9.09, -400.00, 940.00");
+        assert_eq!(
+            kinds(&detector.evaluate(&turned, INTERVAL)),
+            [AnomalyKind::SuddenAcceleration]
+        );
+        let normal_after = (0..60)
+            .position(|_| detector.evaluate(&turned, INTERVAL).findings.is_empty())
+            .expect("the new position becomes normal");
+        assert!(normal_after * 5 < 120, "took {} s", normal_after * 5);
+    }
+
+    #[test]
+    fn harsh_braking_is_detected() {
+        let mut detector = rested_detector();
+        let braking = with("-9.09, -14.34", "-259.09, -14.34");
+        let evaluation = detector.evaluate(&braking, INTERVAL);
+        assert_eq!(
+            kinds(&evaluation),
+            [AnomalyKind::SuddenAcceleration, AnomalyKind::HarshBraking]
+        );
+        assert!(evaluation.findings[1].value < -150.0);
+    }
+
+    #[test]
+    fn harsh_acceleration_along_negative_axis_is_detected() {
+        let mut detector = Detector::new(Settings {
+            forward_axis: "-y".parse().unwrap(),
+            ..settings()
+        });
+        detector.evaluate(&parse_telemetry(RESTING), INTERVAL);
+        let accelerating = with("-14.34", "-214.34");
+        assert!(kinds(&detector.evaluate(&accelerating, INTERVAL)).contains(&AnomalyKind::HarshAcceleration));
+    }
+
+    #[test]
+    fn large_temperature_change_is_detected() {
+        let mut detector = rested_detector();
+        let hot = with("Temperature: 28.98", "Temperature: 33.50");
+        let evaluation = detector.evaluate(&hot, INTERVAL);
+        assert_eq!(kinds(&evaluation), [AnomalyKind::TemperatureChange]);
+        assert_eq!(evaluation.findings[0].value, 33.5);
+    }
+
+    #[test]
+    fn slow_warm_up_is_normal() {
+        let mut detector = rested_detector();
+        for step in 1..=120 {
+            // 2 degrees over 10 minutes
+            let warmer = format!("Temperature: {:.2}", 28.98 + step as f64 * 2.0 / 120.0);
+            let sample = with("Temperature: 28.98", &warmer);
+            assert!(detector.evaluate(&sample, INTERVAL).findings.is_empty());
         }
     }
 
     #[test]
-    fn turning_the_device_is_a_sudden_change() {
-        let mut detector = detector();
-        detector.evaluate(&parse_telemetry(POSITION_1));
-        let evaluation = detector.evaluate(&parse_telemetry(POSITION_2[0]));
-        assert_eq!(evaluation.mode, "position_2");
-        assert!(evaluation.findings.iter().all(|f| f.kind == AnomalyKind::SuddenChange));
-        assert!(evaluation.findings.iter().any(|f| f.signal == "mag_z"));
+    fn magnetometer_humidity_and_pressure_are_not_monitored() {
+        let mut detector = rested_detector();
+        let disturbed = parse_telemetry(
+            &RESTING
+                .replace("108.00, 216.00, -516.00", "-400.00, 600.00, 100.00")
+                .replace("Humidity: 50.02", "Humidity: 80.00")
+                .replace("Pressure: 965.06", "Pressure: 900.00"),
+        );
+        let evaluation = detector.evaluate(&disturbed, INTERVAL);
+        assert!(evaluation.findings.is_empty());
+        let mag = evaluation.signals.iter().find(|s| s.name == "mag_x").unwrap();
+        assert!(mag.normal.is_none());
     }
 
     #[test]
-    fn tilting_the_device_is_detected() {
-        let mut detector = detector();
-        detector.evaluate(&parse_telemetry(POSITION_1));
-        let tilted = POSITION_1.replace("4.51, -26.53, 1023.89", "-73.93, -490.87, 881.76");
-        let findings = detector.evaluate(&parse_telemetry(&tilted)).findings;
-        assert!(findings.iter().any(|f| f.signal == "accel_y" && f.kind == AnomalyKind::OutOfRange));
-        assert!(findings.iter().any(|f| f.signal == "accel_y" && f.kind == AnomalyKind::SuddenChange));
-    }
-
-    #[test]
-    fn unknown_heading_is_out_of_range() {
-        let mut detector = detector();
-        let turned = POSITION_1.replace("616.50, 301.50, 586.50", "-300.00, 500.00, 100.00");
-        let findings = detector.evaluate(&parse_telemetry(&turned)).findings;
-        assert!(findings.iter().any(|f| f.signal == "mag_x" && f.kind == AnomalyKind::OutOfRange));
-    }
-
-    #[test]
-    fn humidity_jump_within_range_is_a_sudden_change() {
-        let mut detector = detector();
-        detector.evaluate(&parse_telemetry(POSITION_1));
-        let breath = POSITION_1.replace("Humidity: 47.53", "Humidity: 57.53");
-        let findings = detector.evaluate(&parse_telemetry(&breath)).findings;
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].signal, "humidity");
-        assert_eq!(findings[0].kind, AnomalyKind::SuddenChange);
-    }
-
-    #[test]
-    fn first_sample_is_never_a_sudden_change() {
-        let mut detector = detector();
-        let hot = POSITION_1.replace("Temperature: 31.16", "Temperature: 45.00");
-        let findings = detector.evaluate(&parse_telemetry(&hot)).findings;
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].kind, AnomalyKind::OutOfRange);
+    fn long_gap_restarts_the_baseline() {
+        let mut detector = rested_detector();
+        let turned = with("-9.09, -14.34, 1023.15", "-9.09, -400.00, 940.00");
+        assert!(detector.evaluate(&turned, 3600.0).findings.is_empty());
     }
 }

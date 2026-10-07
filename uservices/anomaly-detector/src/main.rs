@@ -13,15 +13,14 @@
 
 // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
 
-//! Detects anomalies in the MXChip AZ3166 telemetry received via MQTT and publishes the result.
+//! Detects acceleration events and large temperature changes in the MXChip AZ3166 telemetry received
+//! via MQTT, publishes the result and serves a dashboard.
 
 use std::{
     net::SocketAddr,
-    path::PathBuf,
     str::FromStr,
     sync::{Arc, Mutex},
-    time::Duration,
-    time::SystemTime,
+    time::{Duration, Instant, SystemTime},
 };
 
 use clap::Parser;
@@ -31,6 +30,9 @@ use tokio::signal::unix::{SignalKind, signal};
 
 mod dashboard;
 mod model;
+
+// used for the first sample, the MXChip publishes every ~5 s
+const DEFAULT_INTERVAL_SECS: f64 = 5.0;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -78,22 +80,6 @@ struct Cli {
         default_value = "vehicle/anomaly"
     )]
     anomaly_topic: String,
-    /// A CSV file with telemetry of normal operation to train the model with
-    /// (az3166-baseline.csv: generated data for two known positions).
-    #[arg(
-        long,
-        value_name = "PATH",
-        env = "TRAINING_DATA",
-        default_value = "/app/training/az3166-recorded.csv"
-    )]
-    training_data: PathBuf,
-    /// The number of standard deviations from the trained mean at which a value is out of range.
-    #[arg(long, env = "LEVEL_THRESHOLD", default_value_t = 6.0)]
-    level_threshold: f64,
-    /// The number of standard deviations of the trained sample-to-sample change at which a change
-    /// is sudden.
-    #[arg(long, env = "CHANGE_THRESHOLD", default_value_t = 8.0)]
-    change_threshold: f64,
     /// The accelerometer axis pointing in the vehicle's driving direction ([+-]x, [+-]y or [+-]z).
     #[arg(
         long,
@@ -104,10 +90,29 @@ struct Cli {
         value_parser = model::ForwardAxis::from_str,
     )]
     forward_axis: model::ForwardAxis,
-    /// The longitudinal acceleration in mg (1000 mg = 1 g) from which on harsh acceleration or
-    /// braking is reported.
+    /// The deviation of the acceleration from the resting baseline in mg (1000 mg = 1 g) from which
+    /// on a sudden acceleration is reported.
+    #[arg(long, value_name = "MG", env = "ACCEL_THRESHOLD_MG", default_value_t = 100.0)]
+    accel_threshold_mg: f64,
+    /// The longitudinal acceleration in mg from which on harsh acceleration or braking is reported.
     #[arg(long, value_name = "MG", env = "HARSH_EVENT_THRESHOLD_MG", default_value_t = 150.0)]
     harsh_event_threshold_mg: f64,
+    /// The deviation of the temperature from its baseline in degrees Celsius from which on a
+    /// temperature change is reported.
+    #[arg(long, value_name = "CELSIUS", env = "TEMPERATURE_THRESHOLD_C", default_value_t = 3.0)]
+    temperature_threshold_c: f64,
+    /// The time constant in seconds with which the acceleration baseline follows a new resting
+    /// position.
+    #[arg(long, value_name = "SECONDS", env = "ACCEL_BASELINE_SECS", default_value_t = 60.0)]
+    accel_baseline_secs: f64,
+    /// The time constant in seconds with which the temperature baseline follows slow changes.
+    #[arg(
+        long,
+        value_name = "SECONDS",
+        env = "TEMPERATURE_BASELINE_SECS",
+        default_value_t = 300.0
+    )]
+    temperature_baseline_secs: f64,
     /// The address to serve the read-only web dashboard on.
     #[arg(
         long,
@@ -122,7 +127,6 @@ struct Cli {
 struct Status<'a> {
     timestamp: String,
     source: &'a str,
-    mode: &'a str,
     anomaly: bool,
     findings: &'a [model::Finding],
 }
@@ -159,34 +163,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
     let cli = Cli::parse();
 
-    let training_data = std::fs::read_to_string(&cli.training_data).map_err(|e| {
-        format!(
-            "cannot read training data {}: {e}",
-            cli.training_data.display()
-        )
-    })?;
-    let model = model::Model::train_from_csv(&training_data)?;
-    for mode in &model.modes {
-        for signal in &mode.signals {
-            info!(
-                "Trained {} {}: normal range {:.2}..{:.2}, max change {:.2} per sample",
-                mode.name,
-                signal.name,
-                signal.mean - cli.level_threshold * signal.std,
-                signal.mean + cli.level_threshold * signal.std,
-                cli.change_threshold * signal.delta_std
-            );
-        }
-    }
-    let mut detector = model::Detector::new(
-        model,
-        cli.level_threshold,
-        cli.change_threshold,
-        Some(model::MotionEvents {
-            forward_axis: cli.forward_axis,
-            threshold_mg: cli.harsh_event_threshold_mg,
-        }),
+    let settings = model::Settings {
+        forward_axis: cli.forward_axis,
+        accel_threshold_mg: cli.accel_threshold_mg,
+        harsh_threshold_mg: cli.harsh_event_threshold_mg,
+        temperature_threshold_c: cli.temperature_threshold_c,
+        accel_baseline_secs: cli.accel_baseline_secs,
+        temperature_baseline_secs: cli.temperature_baseline_secs,
+    };
+    info!(
+        "Monitoring acceleration (> {} mg from rest, harsh events > {} mg) and temperature (> {} °C from baseline)",
+        settings.accel_threshold_mg, settings.harsh_threshold_mg, settings.temperature_threshold_c
     );
+    let mut detector = model::Detector::new(settings);
     let source = cli
         .telemetry_topic
         .split('/')
@@ -226,7 +215,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut sigint = signal(SignalKind::interrupt())?;
     let mut connected = false;
     let mut anomalous = false;
-    let mut current_mode = String::new();
+    let mut previous_sample: Option<Instant> = None;
     loop {
         if !connected {
             tokio::select! {
@@ -254,44 +243,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             debug!("Ignoring telemetry without known signals");
             continue;
         }
-        let evaluation = detector.evaluate(&sample);
-        if evaluation.mode != current_mode {
-            info!("Telemetry matches trained mode {}", evaluation.mode);
-            current_mode = evaluation.mode.to_string();
-        }
-        let ranges = evaluation.ranges;
-        let findings = evaluation.findings;
-        for finding in &findings {
+        let now = Instant::now();
+        let elapsed = previous_sample
+            .map(|previous| now.duration_since(previous).as_secs_f64())
+            .unwrap_or(DEFAULT_INTERVAL_SECS);
+        previous_sample = Some(now);
+
+        let evaluation = detector.evaluate(&sample, elapsed);
+        for finding in &evaluation.findings {
             warn!(
-                "Anomaly in {}: {:?}, value {} (normal {}..{}, score {})",
-                finding.signal,
-                finding.kind,
-                finding.value,
-                finding.normal_min,
-                finding.normal_max,
-                finding.score
+                "Anomaly in {}: {:?}, value {} (normal {}..{})",
+                finding.signal, finding.kind, finding.value, finding.normal_min, finding.normal_max
             );
         }
-        if findings.is_empty() {
+        if evaluation.findings.is_empty() {
             if anomalous {
                 info!("Telemetry is back to normal");
             } else {
                 debug!("Telemetry is normal");
             }
         }
-        anomalous = !findings.is_empty();
+        anomalous = !evaluation.findings.is_empty();
 
         let timestamp = humantime::format_rfc3339_millis(SystemTime::now()).to_string();
         dashboard_state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .update(&timestamp, &current_mode, &sample, &ranges, &findings);
+            .update(&timestamp, &evaluation.signals, &evaluation.findings);
         let status = Status {
             timestamp,
             source: &source,
-            mode: &current_mode,
             anomaly: anomalous,
-            findings: &findings,
+            findings: &evaluation.findings,
         };
         let payload = serde_json::to_vec(&status)?;
         let status_message = mqtt::MessageBuilder::new()

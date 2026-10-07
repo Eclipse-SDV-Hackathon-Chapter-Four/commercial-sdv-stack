@@ -7,8 +7,10 @@
 "use strict";
 
 const UNITS = {
-  pressure: "hPa",
+  acceleration: "mg",
+  longitudinal_accel: "mg",
   temperature: "°C",
+  pressure: "hPa",
   humidity: "%",
   accel_x: "mg",
   accel_y: "mg",
@@ -16,7 +18,10 @@ const UNITS = {
   mag_x: "mG",
   mag_y: "mG",
   mag_z: "mG",
-  longitudinal_accel: "mg",
+};
+const LABELS = {
+  acceleration: "acceleration vs. rest",
+  longitudinal_accel: "longitudinal (+ accelerating, − braking)",
 };
 // the MXChip publishes every ~5 s
 const STALE_MS = 15000;
@@ -44,20 +49,23 @@ function sparkline(view) {
   const width = 180;
   const height = 36;
   const values = view.history;
-  const low = Math.min(view.normal_min, ...values);
-  const high = Math.max(view.normal_max, ...values);
+  const monitored = view.normal_min !== null;
+  const low = Math.min(...values, ...(monitored ? [view.normal_min] : []));
+  const high = Math.max(...values, ...(monitored ? [view.normal_max] : []));
   const span = high - low || 1;
   const y = (value) => height - 2 - ((value - low) / span) * (height - 4);
   const chart = svg("svg", { viewBox: `0 0 ${width} ${height}`, width, height });
-  chart.appendChild(
-    svg("rect", {
-      x: 0,
-      width,
-      y: y(view.normal_max),
-      height: Math.max(1, y(view.normal_min) - y(view.normal_max)),
-      class: "band",
-    }),
-  );
+  if (monitored) {
+    chart.appendChild(
+      svg("rect", {
+        x: 0,
+        width,
+        y: y(view.normal_max),
+        height: Math.max(1, y(view.normal_min) - y(view.normal_max)),
+        class: "band",
+      }),
+    );
+  }
   if (values.length > 1) {
     const points = values
       .map((value, i) => `${((i / (values.length - 1)) * width).toFixed(1)},${y(value).toFixed(1)}`)
@@ -75,7 +83,6 @@ function setBadge(text, state) {
 
 function render(status) {
   document.getElementById("source").textContent = status.source || "–";
-  document.getElementById("mode").textContent = status.mode || "–";
   document.getElementById("samples").textContent = status.samples;
   document.getElementById("updated").textContent = status.updated
     ? new Date(status.updated).toLocaleTimeString()
@@ -87,16 +94,19 @@ function render(status) {
   else setBadge("NORMAL", "ok");
 
   const rows = status.signals.map((view) => {
-    const row = element("tr");
+    const monitored = view.normal_min !== null;
+    const row = element("tr", undefined, monitored ? "" : "muted");
     if (view.anomalous) row.className = "bad";
     const state = element("td");
-    state.appendChild(element("span", view.anomalous ? "anomaly" : "normal", view.anomalous ? "pill bad" : "pill ok"));
+    if (!monitored) state.appendChild(element("span", "not monitored", "pill off"));
+    else if (view.anomalous) state.appendChild(element("span", "anomaly", "pill bad"));
+    else state.appendChild(element("span", "normal", "pill ok"));
     const chart = element("td");
     chart.appendChild(sparkline(view));
     row.append(
-      element("td", view.name),
+      element("td", LABELS[view.name] || view.name),
       element("td", format(view.value, view.name), "num"),
-      element("td", `${view.normal_min.toFixed(2)} … ${view.normal_max.toFixed(2)}`, "num"),
+      element("td", monitored ? `${view.normal_min.toFixed(2)} … ${view.normal_max.toFixed(2)}` : "–", "num"),
       state,
       chart,
     );
@@ -108,7 +118,7 @@ function render(status) {
     const row = element("tr");
     row.append(
       element("td", new Date(event.timestamp).toLocaleTimeString()),
-      element("td", event.signal),
+      element("td", LABELS[event.signal] || event.signal),
       element("td", event.kind.replaceAll("_", " ")),
       element("td", format(event.value, event.signal), "num"),
       element("td", `${event.normal_min.toFixed(2)} … ${event.normal_max.toFixed(2)}`, "num"),

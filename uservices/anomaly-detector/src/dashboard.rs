@@ -17,7 +17,7 @@
 //! events. Serves three static files and one JSON endpoint; no external assets are needed.
 
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     net::SocketAddr,
     sync::{Arc, Mutex},
     time::Duration,
@@ -29,7 +29,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
-use crate::model::{Finding, NormalRange};
+use crate::model::{Finding, SignalState};
 
 // 10 minutes at the MXChip's 5 s interval
 const HISTORY_LENGTH: usize = 120;
@@ -44,8 +44,9 @@ const STYLE_CSS: &str = include_str!("../web/style.css");
 struct SignalView {
     name: String,
     value: Option<f64>,
-    normal_min: f64,
-    normal_max: f64,
+    /// None for signals that are shown but not monitored.
+    normal_min: Option<f64>,
+    normal_max: Option<f64>,
     anomalous: bool,
     history: VecDeque<f64>,
 }
@@ -61,7 +62,6 @@ struct Event {
 pub(crate) struct DashboardState {
     source: String,
     updated: Option<String>,
-    mode: String,
     anomaly: bool,
     samples: u64,
     signals: Vec<SignalView>,
@@ -79,41 +79,31 @@ impl DashboardState {
         }
     }
 
-    pub(crate) fn update(
-        &mut self,
-        timestamp: &str,
-        mode: &str,
-        sample: &HashMap<&str, f64>,
-        ranges: &[NormalRange],
-        findings: &[Finding],
-    ) {
+    pub(crate) fn update(&mut self, timestamp: &str, signals: &[SignalState], findings: &[Finding]) {
         self.updated = Some(timestamp.to_string());
-        self.mode = mode.to_string();
         self.anomaly = !findings.is_empty();
         self.samples += 1;
         self.findings = findings.to_vec();
-        for range in ranges {
-            let index = match self.signals.iter().position(|s| s.name == range.signal) {
+        for signal in signals {
+            let index = match self.signals.iter().position(|s| s.name == signal.name) {
                 Some(index) => index,
                 None => {
                     self.signals.push(SignalView {
-                        name: range.signal.clone(),
+                        name: signal.name.clone(),
                         ..Default::default()
                     });
                     self.signals.len() - 1
                 }
             };
             let view = &mut self.signals[index];
-            view.value = sample.get(range.signal.as_str()).copied();
-            view.normal_min = range.min;
-            view.normal_max = range.max;
-            view.anomalous = findings.iter().any(|f| f.signal == range.signal);
-            if let Some(value) = view.value {
-                if view.history.len() == HISTORY_LENGTH {
-                    view.history.pop_front();
-                }
-                view.history.push_back(value);
+            view.value = Some(signal.value);
+            view.normal_min = signal.normal.map(|(min, _)| min);
+            view.normal_max = signal.normal.map(|(_, max)| max);
+            view.anomalous = findings.iter().any(|f| f.signal == signal.name);
+            if view.history.len() == HISTORY_LENGTH {
+                view.history.pop_front();
             }
+            view.history.push_back(signal.value);
         }
         for finding in findings {
             if self.events.len() == EVENT_COUNT {
@@ -189,11 +179,11 @@ mod tests {
     use super::*;
     use crate::model::AnomalyKind;
 
-    fn range(signal: &str) -> NormalRange {
-        NormalRange {
-            signal: signal.to_string(),
-            min: 0.0,
-            max: 10.0,
+    fn humidity(value: f64, normal: Option<(f64, f64)>) -> SignalState {
+        SignalState {
+            name: "humidity".to_string(),
+            value,
+            normal,
         }
     }
 
@@ -202,15 +192,14 @@ mod tests {
         let mut state = DashboardState::new("ThreadXAZ3166");
         let finding = Finding {
             signal: "humidity".to_string(),
-            kind: AnomalyKind::SuddenChange,
+            kind: AnomalyKind::TemperatureChange,
             value: 20.0,
             score: 9.0,
             normal_min: 0.0,
             normal_max: 10.0,
         };
         for i in 0..200 {
-            let sample = HashMap::from([("humidity", i as f64)]);
-            state.update("t", "recorded", &sample, &[range("humidity")], &[finding.clone()]);
+            state.update("t", &[humidity(i as f64, Some((0.0, 10.0)))], &[finding.clone()]);
         }
         assert_eq!(state.samples, 200);
         assert_eq!(state.signals.len(), 1);
@@ -223,10 +212,10 @@ mod tests {
     #[test]
     fn normal_sample_clears_anomaly() {
         let mut state = DashboardState::new("ThreadXAZ3166");
-        let sample = HashMap::from([("humidity", 5.0)]);
-        state.update("t", "recorded", &sample, &[range("humidity")], &[]);
+        state.update("t", &[humidity(5.0, None)], &[]);
         assert!(!state.anomaly);
         assert!(!state.signals[0].anomalous);
+        assert_eq!(state.signals[0].normal_min, None);
         assert!(state.events.is_empty());
     }
 }

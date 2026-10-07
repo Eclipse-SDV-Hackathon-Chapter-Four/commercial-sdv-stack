@@ -99,6 +99,15 @@ tr.bad td {
   background: #c0392b;
 }
 
+.pill.off {
+  background: #3a414c;
+  color: #9aa4b2;
+}
+
+tr.muted td {
+  color: #9aa4b2;
+}
+
 .band {
   fill: rgba(31, 122, 61, 0.35);
 }
