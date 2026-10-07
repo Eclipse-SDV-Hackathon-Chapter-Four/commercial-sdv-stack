@@ -12,19 +12,39 @@
 #
 # AI-generated (GitHub Copilot, Claude Opus 5.5) - i.MX95 two-board deployment
 #
-# Backend (Mac) override for the two-board deployment. sovd-cda, powertrain-mode-controller
-# and ecu-sim run on the boards, so start all other services explicitly:
-#
-#   docker compose -f docker-compose.yaml -f deploy/imx95/docker-compose.mac.yaml \
-#     --profile infra --profile fw-update --profile powertrain up -d \
-#     dozzle spire-server spire-agent-backend spire-agent-vehicle mosquitto fms \
-#     symphony-api symphony-portal symphony-agent ecu-updater databroker vehicle-properties
+# Backend (Mac) override for the two-board deployment; start it with deploy/imx95/backend.sh.
 
 services:
+  # these run on the boards; the "board" profile is never enabled on the Mac
+  sovd-cda:
+    profiles: !override
+      - board
+  powertrain-mode-controller:
+    profiles: !override
+      - board
+  ecu-sim:
+    profiles: !override
+      - board
+
+  # time source for the offline boards (board B gets it from board A's ntpd)
+  ntp:
+    profiles:
+      - infra
+      - fw-update
+      - powertrain
+    image: cturra/ntp:latest
+    environment:
+      # 127.x makes chrony serve the local (Mac) clock, so no internet is needed
+      - NTP_SERVERS=127.127.1.1
+    ports:
+      - "${MAC_IP:-192.168.2.101}:123:123/udp"
+    restart: unless-stopped
+
   dozzle:
     environment:
       # board B's agent is only reachable through the relay on board A (port 7008)
       - DOZZLE_REMOTE_AGENT=${BOARD_A_IP:-192.168.2.10}:7007,${BOARD_A_IP:-192.168.2.10}:7008
+    restart: unless-stopped
   spire-server:
     ports: !override
       - "${MAC_IP:-192.168.2.101}:8081:8081"
@@ -32,3 +52,13 @@ services:
     ports: !override
       - "127.0.0.1:1883:1883"
       - "${MAC_IP:-192.168.2.101}:1883:1883"
+  fms:
+    restart: unless-stopped
+  ecu-updater:
+    restart: unless-stopped
+  databroker:
+    ports: !override
+      - "127.0.0.1:${DATABROKER_PORT:-55555}:55555"
+    restart: unless-stopped
+  vehicle-properties:
+    restart: unless-stopped
