@@ -8,6 +8,8 @@
 # Sets up the AutoSD VM (see vm.sh) for the backend, copies the compose files and config into
 # it, loads the images from IMAGES (docker save | gzip) if set and starts the backend without
 # Symphony. The VM gets everything from the Mac: it cannot verify TLS behind the corporate proxy.
+# IMAGES must also contain the powertrain-mode-controller image, which runs on board A:
+# scripts/register_workloads.sh approves every workload image by its digest.
 
 set -e
 

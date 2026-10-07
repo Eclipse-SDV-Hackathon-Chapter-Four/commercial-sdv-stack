@@ -58,6 +58,9 @@ for workload in "${WORKLOADS[@]}"; do
     echo "image not built locally: $image (build it with: docker compose build $service)" >&2
     exit 1
   fi
+  # AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16: Podman prints image IDs without
+  # the algorithm prefix that SPIRE's selectors use
+  case "$digest" in sha256:*) ;; *) digest="sha256:$digest" ;; esac
   echo "approving $spiffe_id -> $digest"
   {
     printf '  - spiffe_id: "%s"\n' "$spiffe_id"
@@ -106,6 +109,8 @@ while read -r -u 3 spiffe_id digest service; do
   container=$(docker compose ps -q "$service" 2>/dev/null || true)
   if [[ -n "$container" ]]; then
     running=$(docker inspect -f '{{.Image}}' "$container")
+    # AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
+    case "$running" in sha256:*) ;; *) running="sha256:$running" ;; esac
     if [[ "$running" != "$digest" ]]; then
       echo "WARNING: running '$service' container uses image $running," >&2
       echo "         which does not match the approved digest - it will be denied" >&2
