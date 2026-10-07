@@ -10,6 +10,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+# Portions of this file were generated with AI assistance -- GitHub Copilot (Claude Opus 5.5)
+#
 
 networks:
   backend:
@@ -30,6 +32,20 @@ volumes:
 configs:
   trust-store:
     file: ./config/spire/certs/trusted-certs.pem
+
+# Only the SPIRE Agent may create, replace or remove its Workload API socket.
+x-spire-workload-api-client-mount: &spire-workload-api-client-mount
+  type: volume
+  target: /tmp/spire-agent/public
+  read_only: true
+  volume:
+    nocopy: true
+
+x-unprivileged-workload: &unprivileged-workload
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
 
 services:
   dozzle: # https://dozzle.dev/guide/what-is-dozzle
@@ -160,15 +176,14 @@ services:
       - MQTT_BROKER_URI=mqtt://mosquitto:1883
       - MQTT_CLIENT_ID=fleet-management-system
       - SPIFFE_ENDPOINT_SOCKET=unix:/tmp/spire-agent/public/api.sock
+    <<: *unprivileged-workload
+    user: "10004:10004"
     depends_on:
       mosquitto:
         condition: service_healthy
     volumes:
-      # the following is needed to talk to the SPIRE Agent's Workload API (via UNIX domain socket)
-      - type: volume
+      - <<: *spire-workload-api-client-mount
         source: spire-agent-socket
-        target: /tmp/spire-agent/public
-        read_only: false
     command: ["mqtt5"]
 
   # IN-VEHICLE SERVICES
@@ -233,16 +248,15 @@ services:
       - MQTT_BROKER_URI=mqtt://mosquitto:1883
       - MQTT_CLIENT_ID=vehicle-properties
       - SPIFFE_ENDPOINT_SOCKET=unix:/tmp/spire-agent/public/api.sock
+    <<: *unprivileged-workload
+    user: "10005:10005"
     depends_on:
       - databroker
       - mosquitto
       - spire-agent
     volumes:
-      # the following is needed to talk to the SPIRE Agent's Workload API (via UNIX domain socket)
-      - type: volume
+      - <<: *spire-workload-api-client-mount
         source: spire-agent-socket
-        target: /tmp/spire-agent/public
-        read_only: false
     command: ["mqtt5"]
   powertrain-mode-controller:
     profiles:
@@ -263,6 +277,8 @@ services:
       - SOVD_SERVER_BASE_URI=http://sovd-cda:20002/vehicle/v15/
       - SOVD_POWERTRAIN_MODE_RESOURCE_PATH=components/blueprint-ecu/data/powertrain_mode
       - SPIFFE_ENDPOINT_SOCKET=unix:/tmp/spire-agent/public/api.sock
+    <<: *unprivileged-workload
+    user: "10002:10100"
     depends_on:
       mosquitto:
         condition: service_healthy
@@ -273,11 +289,8 @@ services:
         source: ./config/powertrain-mode-controller
         target: /app/config
         read_only: true
-      # the following is needed to talk to the SPIRE Agent's Workload API (via UNIX domain socket)
-      - type: volume
+      - <<: *spire-workload-api-client-mount
         source: spire-agent-socket
-        target: /tmp/spire-agent/public
-        read_only: false
     command: ["mqtt5"]
   sovd-cda:
     profiles:
@@ -296,11 +309,8 @@ services:
       - "${CDA_PORT:-20002}:20002"
     volumes:
       - ./config/cda:/app/odx:ro
-      # the following is needed to talk to the SPIRE Agent's Workload API (via UNIX domain socket)
-      - type: volume
+      - <<: *spire-workload-api-client-mount
         source: spire-agent-socket
-        target: /tmp/spire-agent/public
-        read_only: false
     hostname: cda
     networks:
       - vehicle-sovd
@@ -310,6 +320,8 @@ services:
     environment:
       - RUST_LOG=info
       - SPIFFE_ENDPOINT_SOCKET=unix:/tmp/spire-agent/public/api.sock
+    <<: *unprivileged-workload
+    user: "10001:10100"
     command: ["-d", "/app/odx"]
     restart: unless-stopped
   ecu-sim:

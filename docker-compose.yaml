@@ -36,6 +36,20 @@ configs:
   trust-store:
     file: ./config/spire/certs/trusted-certs.pem
 
+# Only the SPIRE Agent may create, replace or remove its Workload API socket.
+x-spire-workload-api-client-mount: &spire-workload-api-client-mount
+  type: volume
+  target: /tmp/spire-agent/public
+  read_only: true
+  volume:
+    nocopy: true
+
+x-unprivileged-workload: &unprivileged-workload
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
 services:
   dozzle: # https://dozzle.dev/guide/what-is-dozzle
     profiles:
@@ -176,17 +190,16 @@ services:
       - MQTT_BROKER_URI=mqtt://mosquitto:1883
       - MQTT_CLIENT_ID=fleet-management-system
       - SPIFFE_ENDPOINT_SOCKET=unix:/tmp/spire-agent/public/api.sock
+    <<: *unprivileged-workload
+    user: "10004:10004"
     depends_on:
       mosquitto:
         condition: service_healthy
       spire-agent-backend:
         condition: service_started
     volumes:
-      # the following is needed to talk to the SPIRE Agent's Workload API (via UNIX domain socket)
-      - type: volume
+      - <<: *spire-workload-api-client-mount
         source: spire-agent-backend-socket
-        target: /tmp/spire-agent/public
-        read_only: false
     command: ["mqtt5"]
 
   # IN-VEHICLE SERVICES
@@ -285,16 +298,15 @@ services:
       - MQTT_BROKER_URI=mqtt://mosquitto:1883
       - MQTT_CLIENT_ID=vehicle-properties
       - SPIFFE_ENDPOINT_SOCKET=unix:/tmp/spire-agent/public/api.sock
+    <<: *unprivileged-workload
+    user: "10005:10005"
     depends_on:
       - databroker
       - mosquitto
       - spire-agent-vehicle
     volumes:
-      # the following is needed to talk to the SPIRE Agent's Workload API (via UNIX domain socket)
-      - type: volume
+      - <<: *spire-workload-api-client-mount
         source: spire-agent-vehicle-socket
-        target: /tmp/spire-agent/public
-        read_only: false
     command: ["mqtt5"]
   powertrain-mode-controller:
     profiles:
@@ -340,11 +352,8 @@ services:
         source: ./config/powertrain-mode-controller
         target: /app/config
         read_only: true
-      # the following is needed to talk to the SPIRE Agent's Workload API (via UNIX domain socket)
-      - type: volume
+      - <<: *spire-workload-api-client-mount
         source: spire-agent-vehicle-socket
-        target: /tmp/spire-agent/public
-        read_only: false
       # the following is needed to talk to the CDA's SOVD API (via UNIX domain socket)
       # AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
       - type: volume
@@ -372,11 +381,8 @@ services:
     volumes:
       - ./config/cda/config:/app/config:ro
       - ./config/cda/odx:/app/odx:ro
-      # the following is needed to talk to the SPIRE Agent's Workload API (via UNIX domain socket)
-      - type: volume
+      - <<: *spire-workload-api-client-mount
         source: spire-agent-vehicle-socket
-        target: /tmp/spire-agent/public
-        read_only: false
       # AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
       - type: volume
         source: cda-sovd-socket

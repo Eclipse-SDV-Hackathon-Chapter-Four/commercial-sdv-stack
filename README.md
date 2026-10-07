@@ -40,6 +40,29 @@ scripts/register_workloads.sh
 
 After successful workload registration, the use cases can be run as described in the following sections.
 
+### Protecting the SPIFFE Workload API
+
+Workloads trust that the Unix domain socket `/tmp/spire-agent/public/api.sock` leads to the genuine local SPIRE agent.
+To keep that assumption valid, the Docker Compose files enforce the following:
+
+- Only the SPIRE agents mount their socket volume (`spire-agent-backend-socket`, `spire-agent-vehicle-socket`) read-write, so only they can create, replace or remove the socket.
+- Workloads mount the socket volume read-only and with `nocopy`, so they can connect to the socket but cannot replace it or seed the volume with content from their image.
+- Workloads run as dedicated non-root users, drop all Linux capabilities and cannot gain new privileges.
+- Only trusted infrastructure (the SPIRE agents for workload attestation and Dozzle) mounts the Docker socket. Note that mounting `docker.sock` read-only does not make the Docker API read-only.
+
+These rules can be checked without starting any containers by running:
+
+```bash
+scripts/check_socket_hardening.sh
+```
+
+Once the stack is running, the following command additionally verifies the live containers: each workload's socket directory refuses writes, and each workload can still reach its SPIRE agent.
+The optional `--agent-restart` flag also restarts each SPIRE agent and verifies that the workloads reach the recreated socket without being restarted themselves:
+
+```bash
+scripts/check_socket_hardening.sh --runtime [--agent-restart]
+```
+
 ## Run the Deploy Firmware Use Case
 
 Start the required components and services by running:
