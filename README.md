@@ -1,3 +1,5 @@
+<!-- Portions of this file were generated with AI assistance (Github Copilot, Claude Opus 5.5). -->
+
 # Commercial Vehicle Use Cases based on Eclipse SDV Software Components
 
 This repository contains artifacts that implement a few use cases that are (not exclusively) relevant for commercial vehicles.
@@ -157,6 +159,8 @@ Start the required components and services by running:
 # Using the default Docker Compose file in the top level folder:
 docker compose --profile infra --profile powertrain up -d
 ```
+
+**Note** The `fms`, `vehicle-properties`, `powertrain-mode-controller`, `sovd-cda` and `ecu-sim` images are always built from the local sources (`pull_policy: build`), so `up` rebuilds them whenever their sources have changed and takes unchanged images from the build cache. After pulling new changes, run the command above again to rebuild the images and recreate the affected containers.
 
 The setting of the powertrain mode can be traced through the system by means of the container logs, which you can examine in the Dozzle console.
 
