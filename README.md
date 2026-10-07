@@ -206,6 +206,23 @@ sequenceDiagram
 2. The _Powertrain Mode Controller_ sets the powertrain mode to _Economy_ by updating corresponding SOVD entity's data value by means of an HTTP PUT request on the _CDA Server_.
 3. The _CDA Server_ sets the powertrain mode to _Economy_ by means of invoking the _Powertrain_Mode_Write_ operation on the _Blueprint ECU_ via UDS.
 
+### Authorization Integration Tests
+
+A standalone Cargo crate in [`tests/`](tests/) verifies the stack's authorization model end to end: valid attested workloads succeed, while unauthorized identities, forbidden operations, wrong audiences, and expired or forged credentials all fail closed.
+
+With the stack running and the workloads registered:
+
+```bash
+# From the repository root folder
+docker compose --profile infra --profile powertrain up -d --build
+scripts/register_workloads.sh
+
+cd tests
+cargo test            # runs the whole matrix (use ./run.sh if you have no local Rust toolchain)
+```
+
+See [tests/README.md](tests/README.md) for the full scenario matrix and characterization notes.
+
 ### What's in the Box?
 
 The Docker Compose file starts up the following components:
