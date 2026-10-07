@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Orchestrator workflow that launches every CI workflow together in a single
+# run. Trigger it manually from the Actions tab (Run workflow) to execute the
+# full CI suite at once; each job below calls an existing reusable workflow.
+
+name: CI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint source code
+    uses: ./.github/workflows/lint_source_code.yaml
+
+  check-dependencies:
+    name: Check 3rd party dependencies
+    uses: ./.github/workflows/check-dependencies.yaml
