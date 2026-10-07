@@ -60,7 +60,8 @@ scp -q -r "$here/board-a/mosquitto" "$BOARD_A:$DEST/"
 # broker passwords are generated once on the board and kept in $DEST/.env (read by docker compose)
 ssh "$BOARD_A" "set -e; sh $DEST/mosquitto/add-user.sh pmc STATUS_MQTT_PASSWORD \
   && sh $DEST/mosquitto/add-user.sh anomaly-detector ANOMALY_MQTT_PASSWORD"
-# SIGHUP makes a running broker reload the password file and ACL
+# SIGHUP makes a running broker reload the password file and ACL; sent from inside the container,
+# as docker kill would mark it manually stopped and unless-stopped would skip it at the next boot
 ssh "$BOARD_A" "chmod 600 $DEST/config/spire/certs/*-key.pem \
   && systemctl daemon-reload && systemctl enable --now dozzle-relay-b.service \
-  && cd $DEST && docker compose up -d && docker compose kill -s HUP mosquitto"
+  && cd $DEST && docker compose up -d && docker compose exec -T mosquitto kill -HUP 1"
