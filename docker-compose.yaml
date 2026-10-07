@@ -10,6 +10,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+# Portions of this file were generated with AI assistance (Github Copilot, Claude Opus 5.5).
+#
 
 networks:
   backend:
@@ -162,6 +164,7 @@ services:
     profiles:
       - powertrain
     image: ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/fms:latest
+    pull_policy: build
     build:
       context: ./uservices
       dockerfile: ./fms/Dockerfile
@@ -269,6 +272,7 @@ services:
     profiles:
       - powertrain
     image: ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/vehicle-properties:latest
+    pull_policy: build
     build:
       context: ./uservices
       dockerfile: ./vehicle-properties/Dockerfile
@@ -296,6 +300,7 @@ services:
     profiles:
       - powertrain
     image: ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/powertrain-mode-controller:latest
+    pull_policy: build
     build:
       context: ./uservices
       dockerfile: ./powertrain/Dockerfile
@@ -352,6 +357,7 @@ services:
     profiles:
       - powertrain
     image: ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/opensovd-cda:latest
+    pull_policy: build
     build:
       context: ./uservices
       dockerfile: ./cda/Dockerfile
@@ -410,6 +416,7 @@ services:
     profiles:
       - powertrain
     image: ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/ecu-sim:latest
+    pull_policy: build
     build:
       context: ./ecu-sim
       dockerfile: docker/Dockerfile
