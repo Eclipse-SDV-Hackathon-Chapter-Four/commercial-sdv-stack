@@ -5,6 +5,8 @@
 # anonymous clients: may follow the powertrain mode but not fake it; signals/ is open for other modules
 topic read vehicle/powertrain/mode
 topic readwrite signals/#
+# MXChip AZ3166 (ThreadX) telemetry
+topic readwrite ThreadXAZ3166/#
 
 user pmc
 topic write vehicle/powertrain/mode
