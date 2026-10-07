@@ -51,9 +51,6 @@ jobs:
     # Generous: images must be pulled and the stack must come up; the expiry
     # test alone sleeps ~70s.
     timeout-minutes: 25
-    defaults:
-      run:
-        working-directory: commercial-sdv-stack
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -63,7 +60,7 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           # Cache keyed on the tests/ crate.
-          cache-workspaces: commercial-sdv-stack/tests
+          cache-workspaces: tests
 
       - name: Show Docker / Compose versions
         run: |
@@ -114,7 +111,7 @@ jobs:
 
       - name: Run authorization matrix
         env:
-          STACK_DIR: ${{ github.workspace }}/commercial-sdv-stack
+          STACK_DIR: ${{ github.workspace }}
         # run.sh uses the host cargo (installed above). The default run executes
         # only the non-ignored authorization tests, including the ~70s expiry
         # check. Pass --nocapture so per-test detail shows up in the CI log.
