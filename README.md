@@ -167,6 +167,39 @@ sequenceDiagram
 
 **Note** The ECU Updater in this example use case does not actually deploy any firmware images to any ECU but only maintains some state in memory. In a future extension of the blueprint, the OpenSOVD CDA server might be used to actually perform an ECU update via UDS.
 
+## Building Behind a TLS-Intercepting Proxy
+
+The local Rust and ECU simulator Dockerfiles accept an optional BuildKit secret
+named `proxy_ca`. Export your organization's trusted root CA as a PEM certificate
+to `config/proxy/ca-cert.crt`, then create `docker-compose.override.yaml`:
+
+```yaml
+services:
+  fms:
+    build: &proxy_build
+      secrets: [proxy_ca]
+  vehicle-properties:
+    build: *proxy_build
+  powertrain-mode-controller:
+    build: *proxy_build
+  sovd-cda:
+    build: *proxy_build
+  ecu-sim:
+    build: *proxy_build
+secrets:
+  proxy_ca:
+    file: ./config/proxy/ca-cert.crt
+```
+
+Compose loads this override automatically. Both local files are ignored by Git.
+The CA is installed in the containers' OS trust stores and, for Java, the JVM
+trust stores; TLS verification remains enabled. Builds without the secret retain
+their default trust stores. After rotating the certificate, rebuild with
+`docker compose --profile infra --profile powertrain build --no-cache` because
+BuildKit does not invalidate its cache when secret contents change.
+
+This configures container trust, not Docker daemon trust for image pulls.
+
 ## Run the Set Powertrain Mode Use Case
 
 In this use case, a Fleet Management System in the backend uses the _Powertrain Mode Controller_ uService on the vehicle to cycle the vehicle's powertrain through all supported modes.
