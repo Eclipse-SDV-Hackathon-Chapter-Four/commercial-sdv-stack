@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<!--
+  SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+
+  See the NOTICE file(s) distributed with this work for additional
+  information regarding copyright ownership.
+
+  This program and the accompanying materials are made available under the
+  terms of the Apache License Version 2.0 which is available at
+  https://www.apache.org/licenses/LICENSE-2.0
+
+  SPDX-License-Identifier: Apache-2.0
+
+  Portions of this file were generated with AI assistance (GitHub Copilot).
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MQTT Event Viewer</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+    <h1>MQTT Event Viewer</h1>
+    <div id="connection" class="badge disconnected" title="">connecting…</div>
+    <div class="counters">
+        <span>received <strong id="count-received">0</strong></span>
+        <span>shown <strong id="count-shown">0</strong></span>
+    </div>
+    <div class="controls">
+        <input id="topic-filter" type="search" placeholder="Topic filter (e.g. vehicle/+/# or substring)">
+        <input id="text-filter" type="search" placeholder="Search payload / properties">
+        <button id="pause" type="button">Pause</button>
+        <button id="clear" type="button" title="Clear the buffer for all viewers">Clear</button>
+        <button id="rpc-toggle" type="button" title="Invoke a uProtocol service operation" hidden>Invoke RPC</button>
+    </div>
+</header>
+<form id="rpc" hidden>
+    <span id="rpc-source" class="rpc-source"></span>
+    <input id="rpc-method" required placeholder="Method URI, e.g. up://vehicle/10301/1/1">
+    <input id="rpc-payload" placeholder='JSON payload (optional), e.g. {"mode":"Economy"}'>
+    <input id="rpc-token" type="password" autocomplete="off" placeholder="Access token (optional)">
+    <button type="submit">Send</button>
+    <span id="rpc-result" class="rpc-result"></span>
+</form>
+<main>
+    <aside id="topics">
+        <h2>Topics</h2>
+        <ul id="topic-list"></ul>
+    </aside>
+    <section id="events">
+        <table>
+            <thead>
+            <tr>
+                <th class="col-id">#</th>
+                <th class="col-time">Time</th>
+                <th class="col-topic">Topic</th>
+                <th class="col-flags">QoS / Type</th>
+                <th class="col-size">Size</th>
+                <th class="col-payload">Payload</th>
+            </tr>
+            </thead>
+            <tbody id="event-rows"></tbody>
+        </table>
+        <p id="empty" class="empty">Waiting for messages…</p>
+    </section>
+    <section id="details" hidden>
+        <div class="details-header">
+            <h2 id="details-title"></h2>
+            <button id="details-close" type="button" title="Close">✕</button>
+        </div>
+        <dl id="details-meta"></dl>
+        <h3>Payload <span id="details-format" class="tag"></span></h3>
+        <pre id="details-payload"></pre>
+        <div id="details-base64-block" hidden>
+            <h3>Base64</h3>
+            <pre id="details-base64"></pre>
+        </div>
+        <div id="details-user-props-block" hidden>
+            <h3 id="details-user-props-title">User properties</h3>
+            <table class="props">
+                <tbody id="details-user-props"></tbody>
+            </table>
+        </div>
+    </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

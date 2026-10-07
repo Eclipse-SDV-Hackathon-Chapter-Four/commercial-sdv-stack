@@ -30,6 +30,12 @@ docker compose --profile infra up -d
 This will start up some common infrastructure components, which are shared by all needed for all cases.
 You can now open _Dozzle_ in your browser at http://localhost:8080 and see the running infrastructure containers and inspect their log output.
 
+<!-- AI-generated (GitHub Copilot) - MQTT event viewer: begin -->
+To watch the uProtocol messages that the components exchange via the Mosquitto broker, add the `mqtt-viewer` profile to any of the `docker compose` commands in this document and open http://localhost:8090.
+The viewer connects as a uProtocol entity itself and can also invoke uProtocol service operations.
+See the [MQTT Event Viewer](mqtt-event-viewer/README.md) for details, including how to use it with the i.MX95 boards.
+<!-- AI-generated - MQTT event viewer: end -->
+
 ## Configure Authorization
 
 Some of the service components that implement the use cases in this blueprint use JSON Web Tokens (JWT) to authenticate and authorize clients. The tokens are issued by [Spire](https://spiffe.io) agents running in the backend and on the vehicle. These agents are connected to a Spire server in the backend which provides the key material need for creating and verifying the tokens. The workload components then use the agent's _SPIFFE Workload API_ to create and/or validate tokens. For this to work, the workloads need to be registered with the Spire server by running the following script:
