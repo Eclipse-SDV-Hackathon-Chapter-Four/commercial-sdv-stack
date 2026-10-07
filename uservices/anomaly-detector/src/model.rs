@@ -24,20 +24,19 @@ const ACCEL_SIGNALS: [&str; 3] = ["accel_x", "accel_y", "accel_z"];
 const OTHER_SIGNALS: [&str; 5] = ["pressure", "humidity", "mag_x", "mag_y", "mag_z"];
 
 /// Parses the AZ3166 telemetry text, e.g. `Pressure: 965.65` or `Acceleration: 4.51, -26.53, 1023.89`
-/// (one line per sensor). Unknown or malformed lines are skipped.
+/// (one line per sensor), or the same as a JSON object, e.g. `{"Pressure": 965.65,
+/// "Acceleration": [4.51, -26.53, 1023.89]}`. Unknown or malformed values are skipped.
 pub(crate) fn parse_telemetry(payload: &str) -> HashMap<&'static str, f64> {
+    if let Ok(serde_json::Value::Object(object)) = serde_json::from_str(payload.trim()) {
+        return parse_json_telemetry(&object);
+    }
     let mut sample = HashMap::new();
     for line in payload.lines() {
         let Some((key, values)) = line.split_once(':') else {
             continue;
         };
-        let names: &[&'static str] = match key.trim() {
-            "Pressure" => &["pressure"],
-            "Temperature" => &["temperature"],
-            "Humidity" => &["humidity"],
-            "Acceleration" => &ACCEL_SIGNALS,
-            "Magnetic" => &["mag_x", "mag_y", "mag_z"],
-            _ => continue,
+        let Some(names) = signal_names(key) else {
+            continue;
         };
         let parsed: Vec<f64> = values
             .split(',')
@@ -48,6 +47,34 @@ pub(crate) fn parse_telemetry(payload: &str) -> HashMap<&'static str, f64> {
         }
     }
     sample
+}
+
+fn parse_json_telemetry(object: &serde_json::Map<String, serde_json::Value>) -> HashMap<&'static str, f64> {
+    let mut sample = HashMap::new();
+    for (key, value) in object {
+        let Some(names) = signal_names(key) else {
+            continue;
+        };
+        let parsed: Vec<f64> = match value {
+            serde_json::Value::Array(values) => values.iter().filter_map(serde_json::Value::as_f64).collect(),
+            value => value.as_f64().into_iter().collect(),
+        };
+        if parsed.len() == names.len() {
+            sample.extend(names.iter().copied().zip(parsed));
+        }
+    }
+    sample
+}
+
+fn signal_names(sensor: &str) -> Option<&'static [&'static str]> {
+    match sensor.trim().to_ascii_lowercase().as_str() {
+        "pressure" => Some(&["pressure"]),
+        "temperature" => Some(&["temperature"]),
+        "humidity" => Some(&["humidity"]),
+        "acceleration" => Some(&ACCEL_SIGNALS),
+        "magnetic" => Some(&["mag_x", "mag_y", "mag_z"]),
+        _ => None,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
@@ -371,6 +398,16 @@ mod tests {
         let sample = parse_telemetry("Pressure: abc\nAcceleration: 1, 2\nFoo: 1\nHumidity: 50.0");
         assert_eq!(sample.len(), 1);
         assert_eq!(sample["humidity"], 50.0);
+    }
+
+    #[test]
+    fn parses_json_telemetry() {
+        let sample = parse_telemetry(
+            r#"{"Temperature": 28.98, "acceleration": [-9.09, -14.34, 1023.15], "Magnetic": [1, 2], "Foo": 1}"#,
+        );
+        assert_eq!(sample.len(), 4);
+        assert_eq!(sample["temperature"], 28.98);
+        assert_eq!(sample["accel_z"], 1023.15);
     }
 
     #[test]

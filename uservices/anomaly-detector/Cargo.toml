@@ -18,6 +18,7 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
+async-trait = { workspace = true }
 clap = { workspace = true, default-features = false, features = [
     "std",
     "derive",
@@ -38,3 +39,5 @@ paho-mqtt = { version = "0.13.3", features = ["vendored-ssl"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+up-rust = { workspace = true }
+up-transport-mqtt5 = { workspace = true }

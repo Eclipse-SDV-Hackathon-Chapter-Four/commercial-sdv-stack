@@ -120,6 +120,15 @@ pub(crate) struct Cli {
         hide_env_values = true
     )]
     status_mqtt_password: Option<String>,
+    /// A uProtocol topic to also publish the current powertrain mode to as an event via MQTT 5
+    /// on the status MQTT broker, e.g. up://powertrain/BC/1/8001 for the MXChip AZ3166.
+    #[arg(
+        long,
+        value_name = "URI",
+        env = "STATUS_UPROTOCOL_TOPIC",
+        value_parser = up_rust::UUri::from_str,
+    )]
+    status_uprotocol_topic: Option<UUri>,
     // AI-generated - issue 16: end
     #[command(flatten)]
     pub opa_config: common::open_policy_agent::OpaConfig,
@@ -174,6 +183,7 @@ impl Cli {
                 topic: self.status_mqtt_topic.clone(),
                 username: self.status_mqtt_username.clone(),
                 password: self.status_mqtt_password.clone(),
+                uprotocol_topic: self.status_uprotocol_topic.clone(),
             })
     }
     // AI-generated - issue 16: end

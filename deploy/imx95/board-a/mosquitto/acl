@@ -9,10 +9,15 @@ topic readwrite signals/#
 topic readwrite ThreadXAZ3166/#
 # anomaly status published by the anomaly detector
 topic read vehicle/anomaly
+# uProtocol over MQTT 5: MXChip AZ3166 telemetry (up://az3166/AB/1/8001) and powertrain mode events
+topic readwrite az3166/#
+topic read powertrain/#
 
 user pmc
 topic write vehicle/powertrain/mode
+topic write powertrain/BC/0/1/8001
 
 user anomaly-detector
 topic read ThreadXAZ3166/telemetry
+topic read az3166/AB/0/1/8001
 topic write vehicle/anomaly

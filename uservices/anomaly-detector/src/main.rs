@@ -33,6 +33,7 @@ use tokio::signal::unix::{SignalKind, signal};
 mod dashboard;
 mod forest;
 mod model;
+mod uprotocol;
 
 // used for the first sample, the MXChip publishes every ~5 s
 const DEFAULT_INTERVAL_SECS: f64 = 5.0;
@@ -77,6 +78,15 @@ struct Cli {
         default_value = "ThreadXAZ3166/telemetry"
     )]
     telemetry_topic: String,
+    /// A uProtocol topic to also receive the AZ3166 telemetry from via MQTT 5 on the same broker
+    /// (e.g. up://az3166/AB/1/8001), with a payload as on TELEMETRY_TOPIC or as JSON.
+    #[arg(
+        long,
+        value_name = "URI",
+        env = "UPROTOCOL_TELEMETRY_TOPIC",
+        value_parser = up_rust::UUri::from_str,
+    )]
+    uprotocol_telemetry_topic: Option<up_rust::UUri>,
     /// The topic to publish the anomaly status to (retained, one message per telemetry sample).
     #[arg(
         long,
@@ -252,6 +262,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let connect_options = connect_options.finalize();
 
+    // the unused sender keeps the receiver pending if no uProtocol topic is configured
+    let (_no_uprotocol, mut uprotocol_payloads) = tokio::sync::mpsc::channel::<String>(1);
+    if let Some(topic) = cli.uprotocol_telemetry_topic.clone() {
+        uprotocol_payloads = uprotocol::subscribe(
+            up_transport_mqtt5::MqttClientOptions {
+                client_id: Some(format!("{}-uprotocol", cli.client_id)),
+                broker_uri: cli.broker_uri.clone(),
+                username: cli.username.clone(),
+                password: cli.password.clone(),
+                ..Default::default()
+            },
+            topic,
+        );
+    }
+
     let mut sigterm = signal(SignalKind::terminate())?;
     let mut sigint = signal(SignalKind::interrupt())?;
     let mut connected = false;
@@ -265,21 +290,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ = connect_and_subscribe(&client, &connect_options, &cli.telemetry_topic) => connected = true,
             }
         }
-        let message = tokio::select! {
+        let payload = tokio::select! {
             _ = sigterm.recv() => break,
             _ = sigint.recv() => break,
-            message = messages.recv() => message,
+            message = messages.recv() => match message {
+                Ok(Some(message)) => message.payload_str().into_owned(),
+                Ok(None) => {
+                    warn!("Lost connection to MQTT broker, reconnecting");
+                    connected = false;
+                    continue;
+                }
+                Err(_) => break,
+            },
+            Some(payload) = uprotocol_payloads.recv() => payload,
         };
-        let message = match message {
-            Ok(Some(message)) => message,
-            Ok(None) => {
-                warn!("Lost connection to MQTT broker, reconnecting");
-                connected = false;
-                continue;
-            }
-            Err(_) => break,
-        };
-        let sample = model::parse_telemetry(&message.payload_str());
+        let sample = model::parse_telemetry(&payload);
         if sample.is_empty() {
             debug!("Ignoring telemetry without known signals");
             continue;

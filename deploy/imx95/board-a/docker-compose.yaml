@@ -84,6 +84,7 @@ services:
       - STATUS_MQTT_BROKER_URI=mqtt://127.0.0.1:1883
       - STATUS_MQTT_USERNAME=pmc
       - STATUS_MQTT_PASSWORD=${STATUS_MQTT_PASSWORD:-}
+      - STATUS_UPROTOCOL_TOPIC=up://powertrain/BC/1/8001
       # AI-generated - issue 16: end
     user: "10002:10100"
     cap_drop:
@@ -140,6 +141,7 @@ services:
       - MQTT_BROKER_URI=mqtt://127.0.0.1:1883
       - MQTT_USERNAME=anomaly-detector
       - MQTT_PASSWORD=${ANOMALY_MQTT_PASSWORD:-}
+      - UPROTOCOL_TELEMETRY_TOPIC=up://az3166/AB/1/8001
     user: "65534:65534"
     cap_drop:
       - ALL

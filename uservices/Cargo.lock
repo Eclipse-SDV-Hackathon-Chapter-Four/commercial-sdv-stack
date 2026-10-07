@@ -100,6 +100,7 @@ dependencies = [
 name = "anomaly-detector"
 version = "0.1.0-SNAPSHOT"
 dependencies = [
+ "async-trait",
  "clap",
  "env_logger",
  "extended-isolation-forest",
@@ -109,6 +110,8 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "up-rust",
+ "up-transport-mqtt5",
 ]
 
 [[package]]

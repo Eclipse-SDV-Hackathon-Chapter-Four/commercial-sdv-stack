@@ -14,7 +14,8 @@
 // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
 
 //! Publishes the current powertrain mode to a plain MQTT topic (retained), so that
-//! clients without uProtocol support can follow mode changes.
+//! clients without uProtocol support can follow mode changes, and optionally as a uProtocol
+//! event via MQTT 5 on the same broker.
 
 use std::time::Duration;
 
@@ -22,8 +23,13 @@ use common::powertrain::ModeMessage;
 use log::{debug, info, warn};
 use paho_mqtt as mqtt;
 use tokio::sync::mpsc;
+use up_rust::{UMessageBuilder, UPayloadFormat, UTransport, UUri};
+use up_transport_mqtt5::{
+    Mqtt5Transport, Mqtt5TransportOptions, MqttClientOptions, TransportMode,
+};
 
 const CLIENT_ID: &str = "powertrain-mode-controller-status";
+const UPROTOCOL_CLIENT_ID: &str = "powertrain-mode-controller-uprotocol";
 // bounded so updates don't pile up while the broker is unreachable
 const QUEUE_SIZE: usize = 4;
 
@@ -32,6 +38,7 @@ pub(crate) struct StatusPublisherConfig {
     pub topic: String,
     pub username: Option<String>,
     pub password: Option<String>,
+    pub uprotocol_topic: Option<UUri>,
 }
 
 pub(crate) struct StatusPublisher {
@@ -64,13 +71,20 @@ impl StatusPublisher {
             config.broker_uri, config.topic
         );
         tokio::spawn(async move {
-            while let Some(mode_message) = receiver.recv().await {
-                if !client.is_connected() {
-                    if let Err(e) = client.connect(connect_options.clone()).await {
-                        warn!("Cannot connect to status MQTT broker: {e}");
-                        continue;
+            let uprotocol = match &config.uprotocol_topic {
+                Some(topic) => match uprotocol_transport(&config, topic).await {
+                    Ok(transport) => {
+                        info!("Publishing powertrain mode changes as uProtocol events [topic: {}]", topic.to_uri(true));
+                        Some((transport, topic.clone()))
                     }
-                }
+                    Err(e) => {
+                        warn!("Cannot create uProtocol MQTT 5 transport: {e}");
+                        None
+                    }
+                },
+                None => None,
+            };
+            while let Some(mode_message) = receiver.recv().await {
                 let payload = match serde_json::to_vec(&mode_message) {
                     Ok(payload) => payload,
                     Err(e) => {
@@ -78,6 +92,15 @@ impl StatusPublisher {
                         continue;
                     }
                 };
+                if let Some((transport, topic)) = &uprotocol {
+                    publish_event(transport, topic, payload.clone()).await;
+                }
+                if !client.is_connected() {
+                    if let Err(e) = client.connect(connect_options.clone()).await {
+                        warn!("Cannot connect to status MQTT broker: {e}");
+                        continue;
+                    }
+                }
                 let message = mqtt::MessageBuilder::new()
                     .topic(&config.topic)
                     .payload(payload)
@@ -98,5 +121,45 @@ impl StatusPublisher {
         if self.sender.try_send(mode_message).is_err() {
             debug!("Status publish queue full, dropping powertrain mode update");
         }
+    }
+}
+
+async fn uprotocol_transport(
+    config: &StatusPublisherConfig,
+    topic: &UUri,
+) -> Result<Mqtt5Transport, up_rust::UStatus> {
+    let options = Mqtt5TransportOptions {
+        mqtt_client_options: MqttClientOptions {
+            client_id: Some(UPROTOCOL_CLIENT_ID.to_string()),
+            broker_uri: config.broker_uri.clone(),
+            username: config.username.clone(),
+            password: config.password.clone(),
+            ..Default::default()
+        },
+        mode: TransportMode::InVehicle,
+        ..Default::default()
+    };
+    Mqtt5Transport::new(options, topic.authority_name()).await
+}
+
+async fn publish_event(transport: &Mqtt5Transport, topic: &UUri, payload: Vec<u8>) {
+    if !transport.is_connected() {
+        if let Err(e) = transport.connect().await {
+            warn!("Cannot connect uProtocol transport to status MQTT broker: {e}");
+            return;
+        }
+    }
+    let message = match UMessageBuilder::publish(topic.clone())
+        .build_with_payload(payload, UPayloadFormat::UPAYLOAD_FORMAT_JSON)
+    {
+        Ok(message) => message,
+        Err(e) => {
+            warn!("Failed to create uProtocol powertrain mode event: {e}");
+            return;
+        }
+    };
+    match transport.send(message).await {
+        Ok(()) => debug!("Published powertrain mode as uProtocol event"),
+        Err(e) => warn!("Failed to publish powertrain mode as uProtocol event: {e}"),
     }
 }
