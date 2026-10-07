@@ -13,17 +13,19 @@
 
 /*
  * AI assistance: parts of this file were generated with Claude Code (Opus 4.8)
- * and reviewed and verified by the human contributor. All content is
- * contributed under the Apache-2.0 license declared above.
+ * and GitHub Copilot (Claude Opus 5.5) and reviewed and verified by the human
+ * contributor. All content is contributed under the Apache-2.0 license declared
+ * above.
  */
 
 //! Stateful attestation & offline tests.
 //!
 //! These mutate the running stack (launch a rogue container, stop/start
-//! spire-server), so they are `#[ignore]`d and excluded from the default run.
-//! Run deliberately, serialized, with the stack up:
+//! spire-server), so they are `#[ignore]`d and excluded from the default
+//! `cargo test`. Run deliberately, serialized, with the stack up:
 //!
-//!   ./run.sh --include-ignored --test-threads=1
+//!   cargo test --test offline -- --ignored --test-threads=1
+//!   # or:  ./run.sh --ignored --test-threads=1
 //!
 //! A global lock serializes them even without `--test-threads=1`, and a Drop
 //! guard restarts spire-server so a failure can't leave it stopped.
@@ -34,7 +36,6 @@ use std::{
     time::Duration,
 };
 
-use reqwest::Method;
 use sdv_integration_tests::*;
 
 // Serialize the stateful tests regardless of --test-threads.
