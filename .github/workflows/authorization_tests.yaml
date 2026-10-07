@@ -115,7 +115,43 @@ jobs:
         # run.sh uses the host cargo (installed above). The default run executes
         # only the non-ignored authorization tests, including the ~70s expiry
         # check. Pass --nocapture so per-test detail shows up in the CI log.
-        run: ./tests/run.sh --nocapture
+        # tee the combined output to a log the report step parses; pipefail keeps
+        # the step's exit code tied to the test result rather than tee's.
+        run: |
+          set -o pipefail
+          ./tests/run.sh --nocapture 2>&1 | tee authz-test-output.log
+
+      - name: Publish test report
+        # Render a report even when the tests fail, so the summary page shows
+        # which checks passed/failed. Skipped if an earlier step bailed before
+        # the tests ran (no log produced).
+        if: always() && hashFiles('authz-test-output.log') != ''
+        run: |
+          log=authz-test-output.log
+          {
+            echo "## Authorization integration test report"
+            echo ""
+            echo "| Test | Result |"
+            echo "| --- | --- |"
+            grep -E '^test .+ \.\.\. (ok|FAILED|ignored)' "$log" | while read -r line; do
+              name="$(printf '%s' "$line" | sed -E 's/^test (.+) \.\.\. (ok|FAILED|ignored).*/\1/')"
+              res="$(printf '%s'  "$line" | sed -E 's/^test .+ \.\.\. (ok|FAILED|ignored).*/\1/')"
+              case "$res" in
+                ok)      icon="✅ pass" ;;
+                FAILED)  icon="❌ fail" ;;
+                ignored) icon="⏭️ ignored" ;;
+                *)       icon="$res" ;;
+              esac
+              echo "| \`$name\` | $icon |"
+            done || true
+            echo ""
+            summary="$(grep -E '^test result:' "$log" | tail -1 || true)"
+            if [ -n "$summary" ]; then
+              echo "**${summary#test result: }**"
+            else
+              echo "_No libtest summary line found — see the step log for details._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Dump container logs on failure
         if: failure()
