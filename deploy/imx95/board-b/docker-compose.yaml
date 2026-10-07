@@ -1,0 +1,45 @@
+#
+# SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# AI-generated (GitHub Copilot, Claude Opus 5.5) - i.MX95 two-board deployment
+#
+# Board B: eth0 = DoIP link to board A (CDA).
+
+name: sdv-imx95-b
+
+services:
+  ecu-sim:
+    image: ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/ecu-sim:latest
+    # must answer CDA's DoIP discovery broadcasts arriving on eth0
+    network_mode: host
+    environment:
+      - SIM_NETWORK_INTERFACE=eth0
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8181/ || exit 1"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  dozzle-agent:
+    image: amir20/dozzle:latest
+    command: agent
+    # the board kernel lacks the iptables raw table that Docker needs for bridge networks
+    network_mode: host
+    environment:
+      - DOZZLE_AGENT_ADDR=${BOARD_B_IP:-10.2.0.11}:7007
+      - DOZZLE_HOSTNAME=imx95-b
+      - DOZZLE_HOST_ID=imx95-b
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped

@@ -1,0 +1,114 @@
+#
+# SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# AI-generated (GitHub Copilot, Claude Opus 5.5) - i.MX95 two-board deployment
+#
+# Board A: eth0 = backend link to the Mac, eth1 = DoIP link to board B (ecu-sim).
+
+name: sdv-imx95-a
+
+volumes:
+  spire-agent-socket:
+  cda-sovd-socket:
+
+services:
+  spire-agent:
+    image: ghcr.io/spiffe/spire-agent:1.15.3
+    pid: host
+    network_mode: host
+    volumes:
+      - ./config/spire/agent/agent.conf:/etc/spire/agent/agent.conf:ro
+      - ./config/spire/certs/trusted-certs.pem:/etc/spire/agent/trusted-certs.pem:ro
+      - ./config/spire/certs/spire-agent-imx95-cert.pem:/etc/spire/agent/cert.pem:ro
+      - ./config/spire/certs/spire-agent-imx95-key.pem:/etc/spire/agent/key.pem:ro
+      - spire-agent-socket:/run/spire/agent/public
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: ["-config", "/etc/spire/agent/agent.conf", "-serverAddress", "${MAC_IP:-192.168.2.101}"]
+    restart: unless-stopped
+
+  sovd-cda:
+    image: ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/opensovd-cda:latest
+    # DoIP vehicle discovery broadcasts must reach board B over eth1
+    network_mode: host
+    # entrypoint.sh would pick up every host address; the tester address must be the eth1 one
+    entrypoint: ["/bin/sh", "-c", "umask 0007 && exec /app/opensovd-cda --tester-address \"$$DOIP_TESTER_IP\" \"$$@\"", "opensovd-cda"]
+    user: "10001:10100"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./config/cda/config:/app/config:ro
+      - ./config/cda/odx:/app/odx:ro
+      - spire-agent-socket:/tmp/spire-agent/public
+      - cda-sovd-socket:/run/cda
+    environment:
+      - DOIP_TESTER_IP=${DOIP_TESTER_IP:-10.2.0.10}
+      - RUST_LOG=info,cda::spiffe_security_plugin=debug
+      - AUTH_REGO_FILE
+      - SPIFFE_ENDPOINT_SOCKET=unix:/tmp/spire-agent/public/api.sock
+    command: ["-d", "/app/odx", "--unix-socket", "/run/cda/cda.sock"]
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /run/cda/cda.sock"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 10s
+    depends_on:
+      - spire-agent
+    restart: unless-stopped
+
+  powertrain-mode-controller:
+    image: ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/powertrain-mode-controller:latest
+    # bridge networks need the iptables raw table, which the board kernel lacks; no listening ports
+    network_mode: host
+    environment:
+      - UP_LOCAL_ADDRESS=up://vehicle/10301/1/0
+      - RUST_LOG=info,powertrain=info
+      - MQTT_BROKER_URI=mqtt://${MAC_IP:-192.168.2.101}:1883
+      - MQTT_CLIENT_ID=powertrain-mode-controller
+      - SOVD_SERVER_BASE_URI=http://localhost/vehicle/v15/
+      - SOVD_SERVER_UNIX_SOCKET=/run/cda/cda.sock
+      - SOVD_POWERTRAIN_MODE_RESOURCE_PATH=components/blueprint-ecu/data/powertrain_mode
+      - SPIFFE_ENDPOINT_SOCKET=unix:/tmp/spire-agent/public/api.sock
+    user: "10002:10100"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./config/powertrain-mode-controller:/app/config:ro
+      - spire-agent-socket:/tmp/spire-agent/public
+      - type: volume
+        source: cda-sovd-socket
+        target: /run/cda
+        read_only: true
+    depends_on:
+      sovd-cda:
+        condition: service_healthy
+      spire-agent:
+        condition: service_started
+    command: ["mqtt5"]
+    restart: unless-stopped
+
+  dozzle-agent:
+    image: amir20/dozzle:latest
+    command: agent
+    # the board kernel lacks the iptables raw table that Docker needs for bridge networks
+    network_mode: host
+    environment:
+      - DOZZLE_AGENT_ADDR=${BOARD_A_IP:-192.168.2.10}:7007
+      - DOZZLE_HOSTNAME=imx95-a
+      - DOZZLE_HOST_ID=imx95-a
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped

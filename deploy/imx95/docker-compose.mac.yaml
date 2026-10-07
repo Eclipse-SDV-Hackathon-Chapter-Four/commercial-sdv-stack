@@ -1,0 +1,34 @@
+#
+# SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# AI-generated (GitHub Copilot, Claude Opus 5.5) - i.MX95 two-board deployment
+#
+# Backend (Mac) override for the two-board deployment. sovd-cda, powertrain-mode-controller
+# and ecu-sim run on the boards, so start all other services explicitly:
+#
+#   docker compose -f docker-compose.yaml -f deploy/imx95/docker-compose.mac.yaml \
+#     --profile infra --profile fw-update --profile powertrain up -d \
+#     dozzle spire-server spire-agent-backend spire-agent-vehicle mosquitto fms \
+#     symphony-api symphony-portal symphony-agent ecu-updater databroker vehicle-properties
+
+services:
+  dozzle:
+    environment:
+      # board B's agent is only reachable through the relay on board A (port 7008)
+      - DOZZLE_REMOTE_AGENT=${BOARD_A_IP:-192.168.2.10}:7007,${BOARD_A_IP:-192.168.2.10}:7008
+  spire-server:
+    ports: !override
+      - "${MAC_IP:-192.168.2.101}:8081:8081"
+  mosquitto:
+    ports: !override
+      - "127.0.0.1:1883:1883"
+      - "${MAC_IP:-192.168.2.101}:1883:1883"

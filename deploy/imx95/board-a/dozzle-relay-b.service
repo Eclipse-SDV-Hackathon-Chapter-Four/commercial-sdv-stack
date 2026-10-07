@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+# SPDX-License-Identifier: Apache-2.0
+# AI-generated (GitHub Copilot, Claude Opus 5.5) - i.MX95 two-board deployment
+
+[Unit]
+Description=Relay board B's Dozzle agent to the backend link
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/socat TCP-LISTEN:7008,bind=192.168.2.10,fork,reuseaddr TCP:10.2.0.11:7007
+Restart=always
+RestartSec=2
+DynamicUser=yes
+
+[Install]
+WantedBy=multi-user.target
