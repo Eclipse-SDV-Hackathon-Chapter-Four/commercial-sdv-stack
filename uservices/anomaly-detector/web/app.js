@@ -20,8 +20,13 @@ const UNITS = {
   mag_z: "mG",
 };
 const LABELS = {
+  isolation_forest_score: "Isolation Forest score",
   acceleration: "acceleration vs. rest",
   longitudinal_accel: "longitudinal (+ accelerating, − braking)",
+};
+const DETECTORS = {
+  isolation_forest: "Isolation Forest",
+  rules: "Rules",
 };
 // the MXChip publishes every ~5 s
 const STALE_MS = 15000;
@@ -81,6 +86,21 @@ function setBadge(text, state) {
   badge.className = `badge ${state}`;
 }
 
+function setPill(id, anomalous, known) {
+  const pill = document.getElementById(id);
+  pill.textContent = !known ? "–" : anomalous ? "anomaly" : "normal";
+  pill.className = `pill ${!known ? "off" : anomalous ? "bad" : "ok"}`;
+}
+
+function renderCompare(status) {
+  const score = status.signals.find((s) => s.name === "isolation_forest_score");
+  setPill("forest", status.findings.some((f) => f.detector === "isolation_forest"), score !== undefined);
+  setPill("rules", status.findings.some((f) => f.detector === "rules"), status.samples > 0);
+  document.getElementById("forest-score").textContent = score
+    ? `score ${score.value.toFixed(3)} / threshold ${score.normal_max.toFixed(3)}`
+    : "warming up";
+}
+
 function render(status) {
   document.getElementById("source").textContent = status.source || "–";
   document.getElementById("samples").textContent = status.samples;
@@ -92,6 +112,7 @@ function render(status) {
   if (stale) setBadge("NO TELEMETRY", "stale");
   else if (status.anomaly) setBadge("ANOMALY", "bad");
   else setBadge("NORMAL", "ok");
+  renderCompare(status);
 
   const rows = status.signals.map((view) => {
     const monitored = view.normal_min !== null;
@@ -117,11 +138,9 @@ function render(status) {
   const events = status.events.map((event) => {
     const row = element("tr");
     row.append(
-      element("td", new Date(event.timestamp).toLocaleTimeString()),
-      element("td", LABELS[event.signal] || event.signal),
-      element("td", event.kind.replaceAll("_", " ")),
-      element("td", format(event.value, event.signal), "num"),
-      element("td", `${event.normal_min.toFixed(2)} … ${event.normal_max.toFixed(2)}`, "num"),
+      element("td", new Date(event.timestamp).toLocaleString()),
+      element("td", DETECTORS[event.detector] || event.detector),
+      element("td", event.cause),
     );
     return row;
   });

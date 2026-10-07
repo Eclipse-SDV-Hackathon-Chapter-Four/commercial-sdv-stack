@@ -13,11 +13,13 @@
 
 // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
 
-//! Detects acceleration events and large temperature changes in the MXChip AZ3166 telemetry received
-//! via MQTT, publishes the result and serves a dashboard.
+//! Detects anomalies in the MXChip AZ3166 telemetry received via MQTT with an Isolation Forest
+//! trained on recorded normal data and with explainable rules (acceleration events, large
+//! temperature changes), publishes the result and serves a dashboard.
 
 use std::{
     net::SocketAddr,
+    path::PathBuf,
     str::FromStr,
     sync::{Arc, Mutex},
     time::{Duration, Instant, SystemTime},
@@ -29,10 +31,13 @@ use paho_mqtt as mqtt;
 use tokio::signal::unix::{SignalKind, signal};
 
 mod dashboard;
+mod forest;
 mod model;
 
 // used for the first sample, the MXChip publishes every ~5 s
 const DEFAULT_INTERVAL_SECS: f64 = 5.0;
+// longer gaps (e.g. broker outage) restart the Isolation Forest's sliding window
+const MAX_WINDOW_GAP_SECS: f64 = 60.0;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -113,6 +118,19 @@ struct Cli {
         default_value_t = 300.0
     )]
     temperature_baseline_secs: f64,
+    /// A CSV file with consecutive telemetry of normal operation to train the Isolation Forest with
+    /// (see training/recording_to_csv.py).
+    #[arg(
+        long,
+        value_name = "PATH",
+        env = "TRAINING_DATA",
+        default_value = "/app/training/az3166-normal.csv"
+    )]
+    training_data: PathBuf,
+    /// The minimum Isolation Forest score (0..1) for an anomaly; the threshold is raised above the
+    /// highest score of the training data if needed.
+    #[arg(long, value_name = "SCORE", env = "MODEL_SCORE_THRESHOLD", default_value_t = 0.6)]
+    model_score_threshold: f64,
     /// The address to serve the read-only web dashboard on.
     #[arg(
         long,
@@ -128,6 +146,8 @@ struct Status<'a> {
     timestamp: String,
     source: &'a str,
     anomaly: bool,
+    model_score: Option<f64>,
+    model_threshold: f64,
     findings: &'a [model::Finding],
 }
 
@@ -176,6 +196,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         settings.accel_threshold_mg, settings.harsh_threshold_mg, settings.temperature_threshold_c
     );
     let mut detector = model::Detector::new(settings);
+
+    let training_data = std::fs::read_to_string(&cli.training_data).map_err(|e| {
+        format!(
+            "cannot read training data {}: {e}",
+            cli.training_data.display()
+        )
+    })?;
+    let forest = forest::IsolationForestModel::train(
+        &forest::read_training_csv(&training_data)?,
+        cli.model_score_threshold,
+    )?;
+    info!(
+        "Trained Isolation Forest on {} feature vectors from {} (window {} samples): highest training score {:.3}, anomaly threshold {:.3}",
+        forest.training_vectors,
+        cli.training_data.display(),
+        forest::WINDOW,
+        forest.max_training_score,
+        forest.threshold
+    );
+    let mut features = forest::FeatureExtractor::default();
+    let threshold = (forest.threshold * 1000.0).round() / 1000.0;
     let source = cli
         .telemetry_topic
         .split('/')
@@ -250,31 +291,82 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         previous_sample = Some(now);
 
         let evaluation = detector.evaluate(&sample, elapsed);
-        for finding in &evaluation.findings {
-            warn!(
-                "Anomaly in {}: {:?}, value {} (normal {}..{})",
-                finding.signal, finding.kind, finding.value, finding.normal_min, finding.normal_max
-            );
+        let mut findings = evaluation.findings;
+        let mut signals = evaluation.signals;
+
+        if elapsed > MAX_WINDOW_GAP_SECS {
+            features.reset();
         }
-        if evaluation.findings.is_empty() {
+        let mut model_score = None;
+        if let (Some(&x), Some(&y), Some(&z), Some(&temperature)) = (
+            sample.get("accel_x"),
+            sample.get("accel_y"),
+            sample.get("accel_z"),
+            sample.get("temperature"),
+        ) {
+            if let Some(vector) = features.push([x, y, z], temperature) {
+                let score = (forest.score(&vector) * 1000.0).round() / 1000.0;
+                model_score = Some(score);
+                signals.insert(
+                    0,
+                    model::SignalState {
+                        name: "isolation_forest_score".to_string(),
+                        value: score,
+                        normal: Some((0.0, threshold)),
+                    },
+                );
+                if score > threshold {
+                    let cause = forest.cause(&vector);
+                    findings.insert(
+                        0,
+                        model::Finding {
+                            detector: "isolation_forest",
+                            signal: "isolation_forest_score".to_string(),
+                            kind: model::AnomalyKind::IsolationForest,
+                            cause: format!(
+                                "unusual {}: {:.1} {} (at most {:.1} {} in normal data), score {:.3} > {:.3}",
+                                cause.feature,
+                                cause.value,
+                                cause.unit,
+                                cause.training_max,
+                                cause.unit,
+                                score,
+                                threshold
+                            ),
+                            value: score,
+                            score: (score / threshold * 100.0).round() / 100.0,
+                            normal_min: 0.0,
+                            normal_max: threshold,
+                        },
+                    );
+                }
+            }
+        }
+
+        for finding in &findings {
+            warn!("ANOMALY detected by {}: {}", finding.detector, finding.cause);
+        }
+        if findings.is_empty() {
             if anomalous {
                 info!("Telemetry is back to normal");
             } else {
-                debug!("Telemetry is normal");
+                debug!("Telemetry is normal (model score {model_score:?})");
             }
         }
-        anomalous = !evaluation.findings.is_empty();
+        anomalous = !findings.is_empty();
 
         let timestamp = humantime::format_rfc3339_millis(SystemTime::now()).to_string();
         dashboard_state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .update(&timestamp, &evaluation.signals, &evaluation.findings);
+            .update(&timestamp, &signals, &findings);
         let status = Status {
             timestamp,
             source: &source,
             anomaly: anomalous,
-            findings: &evaluation.findings,
+            model_score,
+            model_threshold: threshold,
+            findings: &findings,
         };
         let payload = serde_json::to_vec(&status)?;
         let status_message = mqtt::MessageBuilder::new()

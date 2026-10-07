@@ -105,6 +105,13 @@ impl DashboardState {
             }
             view.history.push_back(signal.value);
         }
+        // signals that appear later (e.g. the model score after its warm-up) keep the detector's order
+        self.signals.sort_by_key(|view| {
+            signals
+                .iter()
+                .position(|s| s.name == view.name)
+                .unwrap_or(usize::MAX)
+        });
         for finding in findings {
             if self.events.len() == EVENT_COUNT {
                 self.events.pop_back();
@@ -191,8 +198,10 @@ mod tests {
     fn keeps_bounded_history_and_events() {
         let mut state = DashboardState::new("ThreadXAZ3166");
         let finding = Finding {
+            detector: "rules",
             signal: "humidity".to_string(),
             kind: AnomalyKind::TemperatureChange,
+            cause: "test".to_string(),
             value: 20.0,
             score: 9.0,
             normal_min: 0.0,

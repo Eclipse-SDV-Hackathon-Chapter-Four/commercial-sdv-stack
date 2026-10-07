@@ -29,6 +29,8 @@ clap = { workspace = true, default-features = false, features = [
     "suggestions",
 ] }
 env_logger = { workspace = true }
+# Extended Isolation Forest (Hariri et al., IEEE TKDE 2019), MIT
+extended-isolation-forest = { version = "0.2.3" }
 humantime = { version = "2.4.0" }
 log = { workspace = true }
 # same version and features as used by up-transport-mqtt5

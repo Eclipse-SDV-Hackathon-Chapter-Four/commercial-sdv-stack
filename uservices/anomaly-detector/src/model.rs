@@ -61,7 +61,11 @@ pub(crate) enum AnomalyKind {
     HarshBraking,
     /// The temperature differs from its baseline by more than the threshold.
     TemperatureChange,
+    /// The Isolation Forest score is above its threshold.
+    IsolationForest,
 }
+
+pub(crate) const RULES: &str = "rules";
 
 /// The accelerometer axis that points in the vehicle's driving direction, e.g. `+x` or `-y`.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -106,8 +110,12 @@ pub(crate) struct Settings {
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct Finding {
+    /// Which detector reported it: "rules" or "isolation_forest".
+    pub detector: &'static str,
     pub signal: String,
     pub kind: AnomalyKind,
+    /// Human-readable explanation of what caused the anomaly.
+    pub cause: String,
     pub value: f64,
     /// Value relative to the threshold (> 1 is an anomaly).
     pub score: f64,
@@ -200,8 +208,13 @@ impl Detector {
 
         if magnitude > settings.accel_threshold_mg {
             findings.push(Finding {
+                detector: RULES,
                 signal: "acceleration".to_string(),
                 kind: AnomalyKind::SuddenAcceleration,
+                cause: format!(
+                    "sudden acceleration of {magnitude:.0} mg compared to rest (limit {:.0} mg)",
+                    settings.accel_threshold_mg
+                ),
                 value: round2(magnitude),
                 score: round2(magnitude / settings.accel_threshold_mg),
                 normal_min: 0.0,
@@ -216,9 +229,19 @@ impl Detector {
             None
         };
         if let Some(kind) = harsh {
+            let what = if kind == AnomalyKind::HarshBraking {
+                "harsh braking"
+            } else {
+                "harsh acceleration"
+            };
             findings.push(Finding {
+                detector: RULES,
                 signal: "longitudinal_accel".to_string(),
                 kind,
+                cause: format!(
+                    "{what}: {longitudinal:+.0} mg along the forward axis (limit ±{:.0} mg)",
+                    settings.harsh_threshold_mg
+                ),
                 value: round2(longitudinal),
                 score: round2(longitudinal.abs() / settings.harsh_threshold_mg),
                 normal_min: -settings.harsh_threshold_mg,
@@ -276,8 +299,14 @@ impl Detector {
         );
         if value < min || value > max {
             findings.push(Finding {
+                detector: RULES,
                 signal: "temperature".to_string(),
                 kind: AnomalyKind::TemperatureChange,
+                cause: format!(
+                    "temperature {value:.1} °C is {:+.1} °C from its baseline (limit ±{:.1} °C)",
+                    value - baseline,
+                    settings.temperature_threshold_c
+                ),
                 value: round2(value),
                 score: round2((value - baseline).abs() / settings.temperature_threshold_c),
                 normal_min: round2(min),
