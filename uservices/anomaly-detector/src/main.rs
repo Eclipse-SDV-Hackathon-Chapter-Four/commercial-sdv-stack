@@ -15,13 +15,21 @@
 
 //! Detects anomalies in the MXChip AZ3166 telemetry received via MQTT and publishes the result.
 
-use std::{path::PathBuf, str::FromStr, time::Duration, time::SystemTime};
+use std::{
+    net::SocketAddr,
+    path::PathBuf,
+    str::FromStr,
+    sync::{Arc, Mutex},
+    time::Duration,
+    time::SystemTime,
+};
 
 use clap::Parser;
 use log::{debug, info, warn};
 use paho_mqtt as mqtt;
 use tokio::signal::unix::{SignalKind, signal};
 
+mod dashboard;
 mod model;
 
 #[derive(Parser)]
@@ -100,6 +108,14 @@ struct Cli {
     /// braking is reported.
     #[arg(long, value_name = "MG", env = "HARSH_EVENT_THRESHOLD_MG", default_value_t = 150.0)]
     harsh_event_threshold_mg: f64,
+    /// The address to serve the read-only web dashboard on.
+    #[arg(
+        long,
+        value_name = "ADDRESS",
+        env = "HTTP_ADDRESS",
+        default_value = "0.0.0.0:8090"
+    )]
+    http_address: SocketAddr,
 }
 
 #[derive(serde::Serialize)]
@@ -178,6 +194,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_default()
         .to_string();
 
+    let dashboard_state = Arc::new(Mutex::new(dashboard::DashboardState::new(&source)));
+    let http_address = cli.http_address;
+    let server_state = dashboard_state.clone();
+    tokio::spawn(async move {
+        if let Err(e) = dashboard::serve(http_address, server_state).await {
+            warn!("Dashboard stopped: {e}");
+        }
+    });
+
     let mut client = mqtt::AsyncClient::new(
         mqtt::CreateOptionsBuilder::new()
             .server_uri(&cli.broker_uri)
@@ -234,6 +259,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("Telemetry matches trained mode {}", evaluation.mode);
             current_mode = evaluation.mode.to_string();
         }
+        let ranges = evaluation.ranges;
         let findings = evaluation.findings;
         for finding in &findings {
             warn!(
@@ -255,8 +281,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         anomalous = !findings.is_empty();
 
+        let timestamp = humantime::format_rfc3339_millis(SystemTime::now()).to_string();
+        dashboard_state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .update(&timestamp, &current_mode, &sample, &ranges, &findings);
         let status = Status {
-            timestamp: humantime::format_rfc3339_millis(SystemTime::now()).to_string(),
+            timestamp,
             source: &source,
             mode: &current_mode,
             anomaly: anomalous,

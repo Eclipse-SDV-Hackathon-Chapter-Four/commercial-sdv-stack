@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<!--
+  SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+  SPDX-License-Identifier: Apache-2.0
+  AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MXChip anomaly detector</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>MXChip AZ3166 &ndash; anomaly detector</h1>
+    <div id="status" class="badge stale">connecting&hellip;</div>
+  </header>
+  <section class="meta">
+    <span>Source <b id="source">&ndash;</b></span>
+    <span>Trained mode <b id="mode">&ndash;</b></span>
+    <span>Samples <b id="samples">0</b></span>
+    <span>Last update <b id="updated">&ndash;</b></span>
+  </section>
+  <table>
+    <thead>
+      <tr><th>Signal</th><th>Current</th><th>Normal range</th><th>State</th><th>Last 10 min</th></tr>
+    </thead>
+    <tbody id="signals"></tbody>
+  </table>
+  <h2>Recent anomalies</h2>
+  <table>
+    <thead>
+      <tr><th>Time</th><th>Signal</th><th>Kind</th><th>Value</th><th>Expected</th></tr>
+    </thead>
+    <tbody id="events"></tbody>
+  </table>
+  <p id="no-events" class="hint">No anomalies so far.</p>
+</body>
+</html>

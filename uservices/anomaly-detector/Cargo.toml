@@ -35,4 +35,4 @@ log = { workspace = true }
 paho-mqtt = { version = "0.13.3", features = ["vendored-ssl"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }

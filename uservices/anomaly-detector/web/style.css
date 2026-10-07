@@ -1,0 +1,118 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+ * SPDX-License-Identifier: Apache-2.0
+ * AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
+ */
+
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  margin: 0 auto;
+  max-width: 1000px;
+  padding: 1rem 1.5rem;
+  background: #10141a;
+  color: #e6e9ef;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+h1 {
+  font-size: 1.4rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+  margin-top: 2rem;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  color: #9aa4b2;
+  margin-bottom: 1rem;
+}
+
+.meta b {
+  color: #e6e9ef;
+  margin-left: 0.3rem;
+}
+
+.badge {
+  padding: 0.5rem 1.2rem;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.badge.ok {
+  background: #1f7a3d;
+}
+
+.badge.bad {
+  background: #c0392b;
+}
+
+.badge.stale {
+  background: #59606b;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #252c36;
+}
+
+th {
+  color: #9aa4b2;
+  font-weight: 500;
+}
+
+td.num {
+  font-variant-numeric: tabular-nums;
+}
+
+tr.bad td {
+  background: rgba(192, 57, 43, 0.15);
+}
+
+.pill {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.pill.ok {
+  background: #1f7a3d;
+}
+
+.pill.bad {
+  background: #c0392b;
+}
+
+.band {
+  fill: rgba(31, 122, 61, 0.35);
+}
+
+.line {
+  fill: none;
+  stroke: #6cb6ff;
+  stroke-width: 1.5;
+}
+
+.line.bad {
+  stroke: #ff7b72;
+}
+
+.hint {
+  color: #9aa4b2;
+}

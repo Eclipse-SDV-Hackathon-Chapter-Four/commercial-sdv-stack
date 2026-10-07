@@ -241,6 +241,15 @@ pub(crate) struct Evaluation<'a> {
     /// The trained mode that matches the sample best.
     pub mode: &'a str,
     pub findings: Vec<Finding>,
+    /// The out-of-range limits of the matched mode.
+    pub ranges: Vec<NormalRange>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct NormalRange {
+    pub signal: String,
+    pub min: f64,
+    pub max: f64,
 }
 
 pub(crate) struct Detector {
@@ -334,6 +343,15 @@ impl Detector {
         Evaluation {
             mode: &mode.name,
             findings,
+            ranges: mode
+                .signals
+                .iter()
+                .map(|signal| NormalRange {
+                    signal: signal.name.clone(),
+                    min: round2(signal.mean - self.level_threshold * signal.std),
+                    max: round2(signal.mean + self.level_threshold * signal.std),
+                })
+                .collect(),
         }
     }
 }
