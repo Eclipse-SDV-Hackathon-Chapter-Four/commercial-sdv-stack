@@ -92,6 +92,10 @@ jobs:
         # cache skips recompiling dependencies and only changed app code
         # rebuilds. Build just the powertrain services (not fw-update's
         # ecu-updater). First run is cold (~20 min); later runs reuse the cache.
+        env:
+          # The local cache lives in /tmp, outside the build context; allow bake
+          # to touch it without the interactive entitlement prompt.
+          BUILDX_BAKE_ENTITLEMENTS_FS: "0"
         run: |
           docker buildx bake \
             --file docker-compose.yaml \
