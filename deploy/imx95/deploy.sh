@@ -57,6 +57,9 @@ scp -q "$config/spire/certs/trusted-certs.pem" "$here/certs/spire-agent-imx95-ce
   "$here/certs/spire-agent-imx95-key.pem" "$BOARD_A:$DEST/config/spire/certs/"
 scp -q "$here/board-a/dozzle-relay-b.service" "$BOARD_A:/etc/systemd/system/"
 scp -q -r "$here/board-a/mosquitto" "$BOARD_A:$DEST/"
+# AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16: the ntp container replaces ntpd
+scp -q -r "$here/board-a/ntp" "$BOARD_A:$DEST/"
+ssh "$BOARD_A" "systemctl disable --now ntpd 2>/dev/null || true"
 # broker passwords are generated once on the board and kept in $DEST/.env (read by docker compose)
 ssh "$BOARD_A" "set -e; sh $DEST/mosquitto/add-user.sh pmc STATUS_MQTT_PASSWORD \
   && sh $DEST/mosquitto/add-user.sh anomaly-detector ANOMALY_MQTT_PASSWORD"

@@ -132,6 +132,31 @@ services:
   # AI-generated - issue 16: end
 
   # AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16: begin
+  # NTP server for board B and Wi-Fi clients (replaces ntpd); starts only after board A's clock is
+  # synced, as Docker waits for time sync
+  ntp:
+    image: cturra/ntp:latest
+    network_mode: host
+    entrypoint: ["/usr/sbin/chronyd", "-d", "-x", "-f", "/etc/chrony/sdv.conf"]
+    volumes:
+      - ./ntp/chrony.conf:/etc/chrony/sdv.conf:ro
+    # fresh on every start, a stale pid file would stop chronyd after a reboot
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - NET_BIND_SERVICE
+      - SETGID
+      - SETUID
+    # the image's check needs chronyc's control socket, which this configuration disables
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+  # AI-generated - issue 16: end
+
+  # AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16: begin
   # flags out-of-range values and sudden changes in the MXChip AZ3166 telemetry
   anomaly-detector:
     image: ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/anomaly-detector:latest

@@ -45,6 +45,9 @@ echo 'L /run/docker.sock - - - - /run/podman/podman.sock' > /etc/tmpfiles.d/dock
 systemd-tmpfiles --create /etc/tmpfiles.d/docker-sock.conf
 systemctl enable --now podman.socket
 systemctl enable chrony-wait.service
+# no RTC and paused while the Mac sleeps: step the clock whenever needed and notice it within a minute
+sed -i -e 's/^makestep .*/makestep 1 -1/' -e 's/^pool \([^ ]*\) iburst$/pool \1 iburst maxpoll 6/' /etc/chrony.conf
+systemctl restart chronyd
 EOF
 
 if [ -n "$IMAGES" ]; then
