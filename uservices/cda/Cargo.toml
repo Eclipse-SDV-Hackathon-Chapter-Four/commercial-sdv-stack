@@ -18,10 +18,13 @@ edition = { workspace = true }
 
 [dependencies]
 # opensovd cda dependencies
-cda-database = { git = "https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git", rev = "99c60782a6e25f6cff9ba3a3418d0750f936016e" }
-cda-interfaces = { git = "https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git", rev = "99c60782a6e25f6cff9ba3a3418d0750f936016e" }
-cda-plugin-security = { git = "https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git", rev = "99c60782a6e25f6cff9ba3a3418d0750f936016e" }
-opensovd_cda_lib = { git = "https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git", rev = "99c60782a6e25f6cff9ba3a3418d0750f936016e", package = "opensovd-cda" }
+# AI-modified (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
+# hackathon fork of upstream; this revision includes the SOVD server Unix domain socket support
+cda-database = { git = "https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git", rev = "58f0c9044e2585d5dd264a980935c43d3c921250" }
+cda-interfaces = { git = "https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git", rev = "58f0c9044e2585d5dd264a980935c43d3c921250" }
+cda-plugin-security = { git = "https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git", rev = "58f0c9044e2585d5dd264a980935c43d3c921250" }
+opensovd_cda_lib = { git = "https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git", rev = "58f0c9044e2585d5dd264a980935c43d3c921250", package = "opensovd-cda" }
+# AI-modified - issue 7: end
 
 async-trait = { workspace = true }
 axum = { version = "0.8.8", default-features = false }
