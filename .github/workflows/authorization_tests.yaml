@@ -150,6 +150,11 @@ jobs:
           retag sovd-cda                   "${bp}/opensovd-cda"
           retag ecu-sim                    "${bp}/ecu-sim"
 
+          # Our private images are now local. Drop the GHCR credential: the rest
+          # of the stack (spire, mosquitto, dozzle, databroker) is public, and an
+          # authenticated cross-org pull of those 500s under this repo's token.
+          docker logout ghcr.io
+
       - name: Rotate build cache
         if: always()
         run: |
