@@ -91,12 +91,13 @@ main { flex: 1; display: flex; min-height: 0; }
 
 #topics {
     width: 280px;
-    overflow: auto;
+    display: flex;
+    flex-direction: column;
     padding: 12px;
     border-right: 1px solid var(--border);
     background: var(--panel);
 }
-#topic-list { list-style: none; margin: 0; padding: 0; }
+#topic-list { list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; overflow: auto; }
 #topic-list li {
     display: flex;
     justify-content: space-between;
@@ -111,6 +112,52 @@ main { flex: 1; display: flex; min-height: 0; }
 #topic-list li:hover { background: var(--bg); }
 #topic-list li.selected { background: rgba(79, 163, 255, .15); color: var(--accent); }
 #topic-list .count { color: var(--muted); }
+
+#tech { flex-shrink: 0; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.tech-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.tech-list .wide { grid-column: 1 / -1; }
+.tech-list a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 12px;
+    text-decoration: none;
+}
+.tech-list a:hover { background: var(--bg); color: var(--accent); }
+/* light tile so that dark brand colors (Java, MQTT) stay visible on the dark theme */
+.tech-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    height: 24px;
+    min-width: 24px;
+    padding: 3px;
+    border-radius: 5px;
+    background: #fff;
+}
+.tech-logo img { display: block; height: 100%; }
+.tech-list .wide .tech-logo { padding: 4px 6px; }
+
+#partners { flex-shrink: 0; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+/* Cummins spans both rows on the left, Allison and its subsidiary Vantage Power are stacked on the right */
+.partner-list { display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 44px 44px; gap: 8px; }
+.partner-list a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    padding: 5px 8px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: #fff;
+}
+.partner-list .tall { grid-row: 1 / 3; padding: 8px; }
+.partner-list a:hover { border-color: var(--accent); }
+.partner-list img { display: block; width: 100%; height: 100%; object-fit: contain; }
 
 #events { flex: 1; overflow: auto; min-width: 0; }
 
