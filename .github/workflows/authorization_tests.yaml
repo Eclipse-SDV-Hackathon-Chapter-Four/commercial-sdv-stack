@@ -48,9 +48,11 @@ env:
 jobs:
   authorization-tests:
     runs-on: ubuntu-latest
-    # A cold run builds all uService images from scratch (~25 min) before the
-    # stack comes up and the ~70s expiry test runs; warm (cached) runs finish
-    # in a few minutes. Sized so a cold run completes and saves the layer cache.
+    # A cold run builds all uService images from scratch (~18-24 min) before the
+    # stack comes up and the ~70s expiry test runs (~21-25 min total). A warm
+    # layer cache trims the build to ~13 min (~16 min total) — the deps layer is
+    # reused, but the services' own code still compiles+links. Sized so even a
+    # cold run completes and saves the cache.
     timeout-minutes: 45
     steps:
       - name: Checkout repository
