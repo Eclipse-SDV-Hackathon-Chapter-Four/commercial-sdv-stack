@@ -131,3 +131,7 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, 2000);
+// browsers throttle timers in background tabs, so catch up as soon as the tab is shown again
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) refresh();
+});
