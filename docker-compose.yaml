@@ -154,6 +154,8 @@ services:
       - infra
       - fw-update
       - powertrain
+      # AI-generated (GitHub Copilot) - MQTT event viewer
+      - mqtt-viewer
     image: eclipse-mosquitto:2
     networks:
       - backend
@@ -201,6 +203,31 @@ services:
       - <<: *spire-workload-api-client-mount
         source: spire-agent-backend-socket
     command: ["mqtt5"]
+
+  # AI-generated (GitHub Copilot) - MQTT event viewer: begin
+  # Web UI showing the uProtocol messages exchanged via the broker, see mqtt-event-viewer/README.md
+  mqtt-event-viewer:
+    profiles:
+      - mqtt-viewer
+    image: ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/mqtt-event-viewer:latest
+    pull_policy: build
+    build:
+      context: ./mqtt-event-viewer
+    networks:
+      - backend
+    ports:
+      - "127.0.0.1:8090:8090"
+    environment:
+      - MQTT_BROKER_URI=tcp://mosquitto:1883
+      - MQTT_TOPICS=#
+      # the viewer connects as a uProtocol entity, set UPROTOCOL_ENABLED=false to show raw MQTT messages instead
+      - UP_LOCAL_ADDRESS=up://backend/103AB/1/0
+    <<: *unprivileged-workload
+    user: "10006:10006"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+  # AI-generated - MQTT event viewer: end
 
   # IN-VEHICLE SERVICES
 
