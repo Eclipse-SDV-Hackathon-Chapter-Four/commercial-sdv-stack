@@ -47,6 +47,6 @@ RUN mv target/${BUILDTARGET}/release/anomaly-detector target/
 FROM scratch
 
 COPY --from=builder /home/rust/target/anomaly-detector /app/anomaly-detector
-COPY --from=builder /home/rust/anomaly-detector/training/az3166-baseline.csv /app/training/
+COPY --from=builder /home/rust/anomaly-detector/training/*.csv /app/training/
 
 ENTRYPOINT [ "/app/anomaly-detector" ]

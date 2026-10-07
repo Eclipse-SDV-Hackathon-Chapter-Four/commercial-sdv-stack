@@ -15,7 +15,7 @@
 
 //! Detects anomalies in the MXChip AZ3166 telemetry received via MQTT and publishes the result.
 
-use std::{path::PathBuf, time::Duration, time::SystemTime};
+use std::{path::PathBuf, str::FromStr, time::Duration, time::SystemTime};
 
 use clap::Parser;
 use log::{debug, info, warn};
@@ -70,12 +70,13 @@ struct Cli {
         default_value = "vehicle/anomaly"
     )]
     anomaly_topic: String,
-    /// A CSV file with telemetry of normal operation to train the model with.
+    /// A CSV file with telemetry of normal operation to train the model with
+    /// (az3166-baseline.csv: generated data for two known positions).
     #[arg(
         long,
         value_name = "PATH",
         env = "TRAINING_DATA",
-        default_value = "/app/training/az3166-baseline.csv"
+        default_value = "/app/training/az3166-recorded.csv"
     )]
     training_data: PathBuf,
     /// The number of standard deviations from the trained mean at which a value is out of range.
@@ -85,6 +86,20 @@ struct Cli {
     /// is sudden.
     #[arg(long, env = "CHANGE_THRESHOLD", default_value_t = 8.0)]
     change_threshold: f64,
+    /// The accelerometer axis pointing in the vehicle's driving direction ([+-]x, [+-]y or [+-]z).
+    #[arg(
+        long,
+        value_name = "AXIS",
+        env = "FORWARD_AXIS",
+        default_value = "+x",
+        allow_hyphen_values = true,
+        value_parser = model::ForwardAxis::from_str,
+    )]
+    forward_axis: model::ForwardAxis,
+    /// The longitudinal acceleration in mg (1000 mg = 1 g) from which on harsh acceleration or
+    /// braking is reported.
+    #[arg(long, value_name = "MG", env = "HARSH_EVENT_THRESHOLD_MG", default_value_t = 150.0)]
+    harsh_event_threshold_mg: f64,
 }
 
 #[derive(serde::Serialize)]
@@ -147,7 +162,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
     }
-    let mut detector = model::Detector::new(model, cli.level_threshold, cli.change_threshold);
+    let mut detector = model::Detector::new(
+        model,
+        cli.level_threshold,
+        cli.change_threshold,
+        Some(model::MotionEvents {
+            forward_axis: cli.forward_axis,
+            threshold_mg: cli.harsh_event_threshold_mg,
+        }),
+    );
     let source = cli
         .telemetry_topic
         .split('/')

@@ -17,12 +17,23 @@
 //! signal, the mean and standard deviation of its level and of the change between consecutive samples,
 //! learned from training data.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
-// keeps a perfectly flat training signal from flagging every rounding difference
-const MIN_STD: f64 = 1e-3;
 const MODE_COLUMN: &str = "mode";
 const DEFAULT_MODE: &str = "default";
+const ACCEL_SIGNALS: [&str; 3] = ["accel_x", "accel_y", "accel_z"];
+
+/// Smallest standard deviation used per signal: the sensor's resolution/tolerance, so that a short
+/// recording of a device lying still does not turn every jitter into an anomaly.
+fn min_std(signal: &str) -> f64 {
+    match signal {
+        "pressure" => 0.25,
+        "temperature" => 0.25,
+        "humidity" => 1.0,
+        s if s.starts_with("accel_") || s.starts_with("mag_") => 5.0,
+        _ => 1e-3,
+    }
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct SignalModel {
@@ -125,8 +136,8 @@ fn train_mode(name: String, header: &[&str], rows: &[Vec<f64>]) -> Result<Mode, 
             SignalModel {
                 name: signal.to_string(),
                 mean,
-                std: std.max(MIN_STD),
-                delta_std: delta_std.max(MIN_STD),
+                std: std.max(min_std(signal)),
+                delta_std: delta_std.max(min_std(signal)),
             }
         })
         .collect();
@@ -174,6 +185,45 @@ pub(crate) enum AnomalyKind {
     OutOfRange,
     /// The value changed much more since the previous sample than in the training data.
     SuddenChange,
+    /// Acceleration along the forward axis beyond the event threshold.
+    HarshAcceleration,
+    /// Deceleration along the forward axis beyond the event threshold.
+    HarshBraking,
+}
+
+/// The accelerometer axis that points in the vehicle's driving direction, e.g. `+x` or `-y`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct ForwardAxis {
+    index: usize,
+    sign: f64,
+}
+
+impl FromStr for ForwardAxis {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (sign, axis) = match s.trim() {
+            s if s.starts_with('-') => (-1.0, &s[1..]),
+            s if s.starts_with('+') => (1.0, &s[1..]),
+            s => (1.0, s),
+        };
+        let index = match axis {
+            "x" => 0,
+            "y" => 1,
+            "z" => 2,
+            _ => return Err(format!("invalid axis {s}, expected [+-]x, [+-]y or [+-]z")),
+        };
+        Ok(Self { index, sign })
+    }
+}
+
+/// Detects harsh acceleration and braking from the change along the forward axis compared to the
+/// trained gravity baseline at rest.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct MotionEvents {
+    pub forward_axis: ForwardAxis,
+    /// Minimum longitudinal acceleration in mg that counts as an event.
+    pub threshold_mg: f64,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -197,15 +247,22 @@ pub(crate) struct Detector {
     model: Model,
     level_threshold: f64,
     change_threshold: f64,
+    motion_events: Option<MotionEvents>,
     previous: HashMap<String, f64>,
 }
 
 impl Detector {
-    pub(crate) fn new(model: Model, level_threshold: f64, change_threshold: f64) -> Self {
+    pub(crate) fn new(
+        model: Model,
+        level_threshold: f64,
+        change_threshold: f64,
+        motion_events: Option<MotionEvents>,
+    ) -> Self {
         Self {
             model,
             level_threshold,
             change_threshold,
+            motion_events,
             previous: HashMap::new(),
         }
     }
@@ -247,6 +304,33 @@ impl Detector {
                 }
             }
         }
+        if let Some(motion) = self.motion_events {
+            let name = ACCEL_SIGNALS[motion.forward_axis.index];
+            if let (Some(axis), Some(&value)) =
+                (mode.signals.iter().find(|s| s.name == name), sample.get(name))
+            {
+                let longitudinal = motion.forward_axis.sign * (value - axis.mean);
+                // never closer to the noise floor than the out-of-range threshold
+                let threshold = motion.threshold_mg.max(self.level_threshold * axis.std);
+                let kind = if longitudinal > threshold {
+                    Some(AnomalyKind::HarshAcceleration)
+                } else if longitudinal < -threshold {
+                    Some(AnomalyKind::HarshBraking)
+                } else {
+                    None
+                };
+                if let Some(kind) = kind {
+                    findings.push(Finding {
+                        signal: "longitudinal_accel".to_string(),
+                        kind,
+                        value: round2(longitudinal),
+                        score: round2(longitudinal.abs() / threshold),
+                        normal_min: round2(-threshold),
+                        normal_max: round2(threshold),
+                    });
+                }
+            }
+        }
         Evaluation {
             mode: &mode.name,
             findings,
@@ -276,7 +360,62 @@ mod tests {
     ];
 
     fn detector() -> Detector {
-        Detector::new(Model::train_from_csv(BASELINE).unwrap(), 6.0, 8.0)
+        Detector::new(
+            Model::train_from_csv(BASELINE).unwrap(),
+            6.0,
+            8.0,
+            Some(MotionEvents {
+                forward_axis: "+x".parse().unwrap(),
+                threshold_mg: 150.0,
+            }),
+        )
+    }
+
+    fn kinds(findings: &[Finding]) -> Vec<AnomalyKind> {
+        findings.iter().map(|f| f.kind).collect()
+    }
+
+    #[test]
+    fn parses_forward_axis() {
+        assert_eq!("+x".parse(), Ok(ForwardAxis { index: 0, sign: 1.0 }));
+        assert_eq!("-y".parse(), Ok(ForwardAxis { index: 1, sign: -1.0 }));
+        assert_eq!("z".parse(), Ok(ForwardAxis { index: 2, sign: 1.0 }));
+        assert!("w".parse::<ForwardAxis>().is_err());
+    }
+
+    #[test]
+    fn braking_along_forward_axis_is_detected() {
+        let mut detector = detector();
+        let braking = POSITION_1.replace("4.51, -26.53", "-295.49, -26.53");
+        let findings = detector.evaluate(&parse_telemetry(&braking)).findings;
+        let event = findings.iter().find(|f| f.signal == "longitudinal_accel").unwrap();
+        assert_eq!(event.kind, AnomalyKind::HarshBraking);
+        assert!(event.value < -150.0);
+    }
+
+    #[test]
+    fn acceleration_along_negative_axis_is_detected() {
+        let mut detector = Detector::new(
+            Model::train_from_csv(BASELINE).unwrap(),
+            6.0,
+            8.0,
+            Some(MotionEvents {
+                forward_axis: "-y".parse().unwrap(),
+                threshold_mg: 150.0,
+            }),
+        );
+        let accelerating = POSITION_1.replace("-26.53", "-326.53");
+        let findings = detector.evaluate(&parse_telemetry(&accelerating)).findings;
+        assert!(kinds(&findings).contains(&AnomalyKind::HarshAcceleration));
+    }
+
+    #[test]
+    fn small_push_is_not_a_harsh_event() {
+        let mut detector = detector();
+        let push = POSITION_1.replace("4.51, -26.53", "104.51, -26.53");
+        let findings = detector.evaluate(&parse_telemetry(&push)).findings;
+        assert!(!kinds(&findings).contains(&AnomalyKind::HarshAcceleration));
+        assert!(!kinds(&findings).contains(&AnomalyKind::HarshBraking));
     }
 
     #[test]
