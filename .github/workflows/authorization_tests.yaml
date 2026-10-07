@@ -17,11 +17,17 @@
 
 name: Authorization integration tests
 
-# Brings up the infra + powertrain Compose stack from the published ghcr.io
-# images, registers the SPIRE workloads, then runs the SPIFFE/JWT authorization
-# matrix (tests/) against the live CDA SOVD API. The stateful #[ignore]d offline
-# tests are not run here (they stop/start spire-server and launch a rogue
-# container); run those manually per tests/README.md.
+# Brings up the infra + powertrain Compose stack, registers the SPIRE workloads,
+# then runs the full SPIFFE/JWT authorization matrix (tests/) against the live
+# CDA SOVD API, INCLUDING the stateful #[ignore]d offline tests (which stop/start
+# spire-server and launch a rogue container).
+#
+# The custom uService images are private upstream, so they are built once and
+# pushed to this fork's GHCR namespace by publish_images.yaml and tagged by a
+# content hash of their build inputs. This job pulls that prebuilt image when the
+# uService sources are unchanged (fast path) and only builds + pushes on a cache
+# miss (e.g. a uService source change), so test-only / config-only PRs skip the
+# ~20-min build entirely.
 
 on:
   push:
@@ -48,11 +54,13 @@ env:
 jobs:
   authorization-tests:
     runs-on: ubuntu-latest
-    # A cold run builds all uService images from scratch (~18-24 min) before the
-    # stack comes up and the ~70s expiry test runs (~21-25 min total). A warm
-    # layer cache trims the build to ~13 min (~16 min total) — the deps layer is
-    # reused, but the services' own code still compiles+links. Sized so even a
-    # cold run completes and saves the cache.
+    permissions:
+      contents: read
+      # Needed only on a cache miss, when this job builds and pushes the images
+      # itself (self-seeding). The fast path only reads packages.
+      packages: write
+    # Fast path (images already in GHCR): pull + stack up + tests ~= 8-10 min.
+    # Cache-miss path builds the images first (~13-24 min). Sized for the latter.
     timeout-minutes: 45
     steps:
       - name: Checkout repository
@@ -70,11 +78,18 @@ jobs:
           docker --version
           docker compose version
 
-      - name: Set up Docker buildx (container driver for layer cache)
-        # The default docker driver can't import/export build cache; a
-        # docker-container builder can. --load in the build step drops the
-        # finished images into the engine store so the compose up steps below
-        # find them with --no-build.
+      - name: Resolve registry and image tag
+        # GHCR names must be lowercase; the content hash keys images on their
+        # build inputs (must match publish_images.yaml exactly).
+        run: |
+          echo "REGISTRY=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG=${{ hashFiles('uservices/**', 'ecu-sim/**', 'docker-compose.yaml') }}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        run: echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+
+      - name: Set up Docker buildx (container driver)
+        # Only exercised on a cache miss, when this job builds the images itself.
         run: |
           docker buildx create --name ci-builder --driver docker-container --use
           docker buildx inspect --bootstrap
@@ -83,40 +98,67 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/.buildx-cache
-          # Key on what changes the image contents; fall back to the newest prior
-          # cache so an unchanged cargo-chef dependency layer is still reused.
           key: buildx-${{ runner.os }}-${{ hashFiles('uservices/**/Cargo.toml', 'uservices/**/Cargo.lock', 'uservices/**/Dockerfile', 'ecu-sim/**/*.gradle*', 'ecu-sim/docker/Dockerfile') }}
           restore-keys: |
             buildx-${{ runner.os }}-
 
-      - name: Build uService images (layer-cached)
-        # The custom uService images are private (not anonymously pullable), so
-        # they must be built here. The Dockerfiles use cargo-chef, so a warm
-        # cache skips recompiling dependencies and only changed app code
-        # rebuilds. Build just the powertrain services (not fw-update's
-        # ecu-updater). First run is cold (~20 min); later runs reuse the cache.
+      - name: Resolve uService images (pull, or build + push on miss)
+        # Fast path: every image already exists in the fork registry at this
+        # content tag -> just pull. Miss path: build + push them (self-seed), so
+        # the next run with the same sources is fast. Either way the images are
+        # retagged to the names docker-compose.yaml references, so the stack
+        # comes up with --no-build.
         env:
-          # The local cache lives in /tmp, outside the build context; allow bake
-          # to touch it without the interactive entitlement prompt.
           BUILDX_BAKE_ENTITLEMENTS_FS: "0"
         run: |
-          docker buildx bake \
-            --file docker-compose.yaml \
-            --set "*.cache-from=type=local,src=/tmp/.buildx-cache" \
-            --set "*.cache-to=type=local,dest=/tmp/.buildx-cache-new,mode=max" \
-            --load \
-            fms vehicle-properties powertrain-mode-controller sovd-cda ecu-sim
+          set -euo pipefail
+          services="fms vehicle-properties powertrain-mode-controller sovd-cda ecu-sim"
+          need_build=0
+          for s in $services; do
+            if docker manifest inspect "${REGISTRY}/${s}:${IMAGE_TAG}" >/dev/null 2>&1; then
+              echo "hit:  ${s}:${IMAGE_TAG}"
+            else
+              echo "miss: ${s}:${IMAGE_TAG}"
+              need_build=1
+            fi
+          done
+
+          if [ "$need_build" = "1" ]; then
+            echo "::notice::Cache miss - building and pushing uService images"
+            docker buildx bake \
+              --file docker-compose.yaml \
+              --set "*.cache-from=type=local,src=/tmp/.buildx-cache" \
+              --set "*.cache-to=type=local,dest=/tmp/.buildx-cache-new,mode=max" \
+              --set "fms.tags=${REGISTRY}/fms:${IMAGE_TAG}" \
+              --set "vehicle-properties.tags=${REGISTRY}/vehicle-properties:${IMAGE_TAG}" \
+              --set "powertrain-mode-controller.tags=${REGISTRY}/powertrain-mode-controller:${IMAGE_TAG}" \
+              --set "sovd-cda.tags=${REGISTRY}/sovd-cda:${IMAGE_TAG}" \
+              --set "ecu-sim.tags=${REGISTRY}/ecu-sim:${IMAGE_TAG}" \
+              --push \
+              $services
+          else
+            echo "::notice::Cache hit - pulling prebuilt uService images"
+          fi
+
+          # Pull each image and retag to the name docker-compose.yaml expects
+          # (note sovd-cda's upstream image is named opensovd-cda).
+          bp="ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack"
+          retag() { docker pull "${REGISTRY}/$1:${IMAGE_TAG}"; docker tag "${REGISTRY}/$1:${IMAGE_TAG}" "$2:latest"; }
+          retag fms                        "${bp}/fms"
+          retag vehicle-properties         "${bp}/vehicle-properties"
+          retag powertrain-mode-controller "${bp}/powertrain-mode-controller"
+          retag sovd-cda                   "${bp}/opensovd-cda"
+          retag ecu-sim                    "${bp}/ecu-sim"
 
       - name: Rotate build cache
-        # buildx local cache grows unbounded otherwise; replace old with new.
         if: always()
         run: |
           rm -rf /tmp/.buildx-cache
           if [ -d /tmp/.buildx-cache-new ]; then mv /tmp/.buildx-cache-new /tmp/.buildx-cache; fi
 
       - name: Start infra profile
-        # Images are either pre-built above (--load) or public (pulled on demand);
-        # --no-build prevents a surprise 20-min rebuild if a tag is missing.
+        # Powertrain images are present locally (pulled/retagged above); public
+        # infra images pull on demand. --no-build forbids a surprise rebuild.
         run: docker compose --profile infra up -d --no-build
 
       - name: Wait for spire-server to accept minting
@@ -158,17 +200,18 @@ jobs:
           docker compose logs sovd-cda ecu-sim spire-agent-vehicle
           exit 1
 
-      - name: Run authorization matrix
+      - name: Run authorization matrix (incl. ignored offline tests)
         env:
           STACK_DIR: ${{ github.workspace }}
-        # run.sh uses the host cargo (installed above). The default run executes
-        # only the non-ignored authorization tests, including the ~70s expiry
-        # check. Pass --nocapture so per-test detail shows up in the CI log.
-        # tee the combined output to a log the report step parses; pipefail keeps
-        # the step's exit code tied to the test result rather than tee's.
+        # --include-ignored runs the full matrix: the authorization checks plus
+        # the stateful offline tests (rogue container, spire-server stop/start).
+        # --test-threads=1 serializes them so the stack mutations don't overlap.
+        # Expect ~2-3 min of test time (two ~70s expiry waits). tee the combined
+        # output to a log the report step parses; pipefail keeps the step's exit
+        # code tied to the test result rather than tee's.
         run: |
           set -o pipefail
-          ./tests/run.sh --nocapture 2>&1 | tee authz-test-output.log
+          ./tests/run.sh --include-ignored --test-threads=1 --nocapture 2>&1 | tee authz-test-output.log
 
       - name: Publish test report
         # Render a report even when the tests fail, so the summary page shows
@@ -194,9 +237,12 @@ jobs:
               echo "| \`$name\` | $icon |"
             done || true
             echo ""
-            summary="$(grep -E '^test result:' "$log" | tail -1 || true)"
-            if [ -n "$summary" ]; then
-              echo "**${summary#test result: }**"
+            # One "test result:" line per test binary (authorization, offline).
+            summaries="$(grep -E '^test result:' "$log" || true)"
+            if [ -n "$summaries" ]; then
+              printf '%s\n' "$summaries" | while read -r r; do
+                echo "- **${r#test result: }**"
+              done
             else
               echo "_No libtest summary line found — see the step log for details._"
             fi
