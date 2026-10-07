@@ -19,11 +19,6 @@ name: CI
 
 on:
   workflow_dispatch:
-  # TEMPORARY: fires a run on this branch so the workflow can be exercised
-  # before it reaches the default branch. Remove before merging.
-  push:
-    branches:
-    - ci/launch-all-workflows
 
 permissions:
   contents: read
