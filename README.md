@@ -56,6 +56,13 @@ These rules can be checked without starting any containers by running:
 scripts/check_socket_hardening.sh
 ```
 
+Once the stack is running, the following command additionally verifies the live containers: each workload's socket directory refuses writes, and each workload can still reach its SPIRE agent.
+The optional `--agent-restart` flag also restarts each SPIRE agent and verifies that the workloads reach the recreated socket without being restarted themselves:
+
+```bash
+scripts/check_socket_hardening.sh --runtime [--agent-restart]
+```
+
 ## Run the Deploy Firmware Use Case
 
 Start the required components and services by running:
