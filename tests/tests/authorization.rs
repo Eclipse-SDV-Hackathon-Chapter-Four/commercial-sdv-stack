@@ -53,6 +53,7 @@ fn authorized_write_is_allowed() {
 
 #[test]
 fn registered_but_forbidden_identity_is_denied() {
+    ensure_variant(); // gate on a ready stack so a denial is 403, not a 404 on an unresolved resource
     // vehicle/properties has NO entry in the CDA allow-list -> every op denied.
     let token = mint_jwt(&spiffe_properties(), &aud_cda(), "300s");
     assert_deny("registered-but-forbidden identity", request(Method::GET, &pwt_path(), Some(&token), None));
@@ -64,18 +65,21 @@ fn unknown_spiffe_id_is_denied() {
     // bypasses attestation, so at the CDA they exercise the SAME "not in the OPA
     // allow-list -> 403" branch. The registered-vs-unregistered *attestation*
     // distinction is covered by modified_image_gets_no_identity in offline.rs.
+    ensure_variant();
     let token = mint_jwt(&spiffe_unknown(), &aud_cda(), "300s");
     assert_deny("unknown SPIFFE ID", request(Method::GET, &pwt_path(), Some(&token), None));
 }
 
 #[test]
 fn wrong_audience_is_denied() {
+    ensure_variant();
     let token = mint_jwt(&spiffe_pmc(), &aud_wrong(), "300s");
     assert_deny("wrong JWT audience", request(Method::GET, &pwt_path(), Some(&token), None));
 }
 
 #[test]
 fn expired_token_is_denied() {
+    ensure_variant();
     // Must wait past SPIRE's ~60s clock-skew leeway (see EXPIRY_WAIT_SECONDS),
     // otherwise a just-expired token is still accepted.
     let token = mint_jwt(&spiffe_pmc(), &aud_cda(), "2s");
@@ -85,6 +89,7 @@ fn expired_token_is_denied() {
 
 #[test]
 fn missing_token_is_denied() {
+    ensure_variant();
     // A missing token is the one case that returns 401 (NoTokenProvided); every
     // other token failure maps to 403. Assert the exact code to guard ordering.
     assert_unauthenticated("missing token", request(Method::GET, &pwt_path(), None, None));
@@ -94,12 +99,14 @@ fn missing_token_is_denied() {
 
 #[test]
 fn tampered_signature_is_denied() {
+    ensure_variant();
     let token = tamper(&mint_jwt(&spiffe_pmc(), &aud_cda(), "300s"));
     assert_deny("tampered signature", request(Method::GET, &pwt_path(), Some(&token), None));
 }
 
 #[test]
 fn alg_none_token_is_denied() {
+    ensure_variant();
     let token = forge_alg_none(&spiffe_pmc(), &aud_cda());
     assert_deny("alg:none forged token", request(Method::GET, &pwt_path(), Some(&token), None));
 }

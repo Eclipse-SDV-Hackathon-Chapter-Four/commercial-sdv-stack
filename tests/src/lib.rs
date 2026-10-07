@@ -86,6 +86,13 @@ pub fn expiry_wait_secs() -> u64 {
     env_or("EXPIRY_WAIT_SECONDS", "70").parse().unwrap_or(70)
 }
 
+/// Max seconds `ensure_variant` polls for the ECU data resource to become
+/// readable before giving up (the SOVD API can answer well before the
+/// downstream ecu-sim/DoIP path resolves a variant). Default 60s.
+pub fn readiness_poll_secs() -> u64 {
+    env_or("READINESS_POLL_SECONDS", "60").parse().unwrap_or(60)
+}
+
 // ---------------------------------------------------------------------------
 // SPIRE helpers
 // ---------------------------------------------------------------------------
@@ -181,16 +188,33 @@ pub fn request(method: Method, path: &str, token: Option<&str>, body: Option<&st
     rb.send().map(|r| r.status().as_u16()).unwrap_or(0)
 }
 
-/// Best-effort trigger of ECU variant detection so reads/writes resolve a
-/// variant. The result is intentionally ignored: the CDA caches variant
-/// detection globally, so this is usually a no-op. If a variant genuinely
-/// cannot be resolved, reads/writes return 404 and the ALLOW tests fail loudly
-/// (never a silent pass), so this helper is a convenience, not a guarantee.
+/// Readiness gate: trigger ECU variant detection and block until an authorized
+/// read actually resolves (2xx), so the whole matrix runs against a fully-ready
+/// stack.
+///
+/// The SOVD API starts answering (the CI readiness probe goes green on *any*
+/// response, incl. 401) before the downstream ecu-sim/DoIP path is connected and
+/// a variant is detected. Until then every data read/write returns 404/5xx
+/// regardless of the credential, which fails *every* test -- ALLOW and DENY
+/// alike (a forbidden token on an unresolved resource 404s instead of 403).
+/// Polling an authorized read here closes that race.
+///
+/// Guarded by `Once` and called at the top of every test, so the first test to
+/// run performs the wait and gates the rest; later calls are a cheap no-op. If
+/// the stack never becomes ready we fall through rather than panic, so each
+/// assertion still fails loudly with its actual status code.
 pub fn ensure_variant() {
     static VARIANT: Once = Once::new();
     VARIANT.call_once(|| {
-        let token = mint_jwt(&spiffe_pmc(), &aud_cda(), "120s");
-        let _ = request(Method::PUT, "components/blueprint-ecu", Some(&token), None);
+        let token = mint_jwt(&spiffe_pmc(), &aud_cda(), "300s");
+        for _ in 0..readiness_poll_secs() {
+            // Re-trigger variant detection, then probe a real authorized read.
+            let _ = request(Method::PUT, "components/blueprint-ecu", Some(&token), None);
+            if (200..300).contains(&request(Method::GET, &pwt_path(), Some(&token), None)) {
+                return;
+            }
+            std::thread::sleep(Duration::from_secs(1));
+        }
     });
 }
 
