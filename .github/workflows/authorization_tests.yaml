@@ -67,8 +67,16 @@ jobs:
           docker --version
           docker compose version
 
+      - name: Pull published images
+        # Every uService defines both a build: section and a published
+        # image: ghcr.io/... tag. `docker compose up` would BUILD them from
+        # source (~20 min of Rust/musl compilation); this job tests the
+        # published images, so pull them up front and run with --no-build
+        # below. Keeps CI to an image pull instead of a full build.
+        run: docker compose --profile infra --profile powertrain pull --quiet
+
       - name: Start infra profile
-        run: docker compose --profile infra up -d
+        run: docker compose --profile infra up -d --no-build --pull never
 
       - name: Wait for spire-server to accept minting
         run: |
@@ -90,7 +98,7 @@ jobs:
         run: scripts/register_workloads.sh
 
       - name: Start powertrain profile
-        run: docker compose --profile infra --profile powertrain up -d
+        run: docker compose --profile infra --profile powertrain up -d --no-build --pull never
 
       - name: Wait for the CDA SOVD API to answer
         run: |
