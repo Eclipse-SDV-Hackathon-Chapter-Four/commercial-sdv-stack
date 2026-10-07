@@ -11,8 +11,9 @@ https://www.apache.org/licenses/LICENSE-2.0
 SPDX-License-Identifier: Apache-2.0
 
 AI assistance: parts of this file were generated with Claude Code (Opus 4.8)
-and reviewed and verified by the human contributor. All content is
-contributed under the Apache-2.0 license declared above.
+and GitHub Copilot (Claude Opus 5.5) and reviewed and verified by the human
+contributor. All content is contributed under the Apache-2.0 license declared
+above.
 -->
 
 # Integration Tests — Authorization Guarantees
@@ -31,7 +32,7 @@ against a required audience via the SPIRE Agent Workload API, then apply an
 
 | Enforcement point | Surface | Required audience | Rego decision | Allowed |
 | --- | --- | --- | --- | --- |
-| `sovd-cda` | HTTP `:20002` (SOVD/REST) | `sovd.cda` | `service_name ∈ allowed_services[spiffe_id]` | `…/vehicle/powertrain-mode-controller` → `Powertrain_Mode_Read`, `Powertrain_Mode_Write` |
+| `sovd-cda` | HTTP (SOVD/REST) via Unix socket `/run/cda/cda.sock` | `sovd.cda` | `service_name ∈ allowed_services[spiffe_id]` | `…/vehicle/powertrain-mode-controller` → `Powertrain_Mode_Read`, `Powertrain_Mode_Write` |
 | `powertrain-mode-controller` | uProtocol RPC (MQTT) | `powertrain.mode-control` | `method_id ∈ allowed_method_ids[spiffe_id]` | `…/backend/fms` → methods `1`, `2` |
 
 **This suite drives the CDA HTTP enforcement point.** It is the ideal test surface: it
@@ -51,8 +52,24 @@ Attestation is covered separately (see [Not yet automated](#not-yet-automated)).
 This is a standalone Cargo crate at the **commercial-sdv-stack root** (`tests/`), next
 to `docker-compose.yaml`. It is deliberately **not** a member of the `uservices`
 workspace, so it never pulls in the musl/cross build — it just drives the running stack.
-The crate shells out to `docker compose exec spire-server ...` to mint tokens and uses
-`reqwest` to call the CDA. Override the stack location with `STACK_DIR=...` if needed.
+The crate shells out to `docker compose exec spire-server ...` to mint tokens. The CDA
+does not listen on any TCP port, so every SOVD request is sent from a short-lived
+`curlimages/curl` container that mounts the CDA's socket volume read-only and runs as
+`10003:10100`, i.e. as a member of the `sovd-clients` group, just like a legitimate client
+(see [Securing Access to the CDA](../README.md#securing-access-to-the-cda)). The volume is
+looked up from the running `sovd-cda` container. Override the stack location with
+`STACK_DIR=...` if needed.
+
+Two properties of the CDA's ECU locks are handled by the suite:
+
+- Writing data requires an ECU lock held by the same SPIFFE ID, so the write test acquires
+  the lock first and releases it afterwards. Locks are owned per SPIFFE ID, so the running
+  Powertrain Mode Controller (same identity) may release it in between; the write is then
+  retried.
+- The CDA checks locks *before* the Rego authorization: while the Powertrain Mode
+  Controller briefly holds the lock, every other identity gets `423 Locked` instead of the
+  authorization decision. Such requests are retried (`LOCKED_RETRIES`, 1s apart); a
+  persistent `423` fails the test.
 
 ## Prerequisites
 
@@ -67,7 +84,8 @@ scripts/register_workloads.sh
 ```
 
 Needs a Rust toolchain (`cargo`) plus a running `docker` daemon. The suite reaches the
-CDA at `http://localhost:20002`.
+CDA via its Unix socket in the `sovd-cda` service's `/run/cda` volume (pulling
+`curlimages/curl` on first use).
 
 ## Running
 
@@ -78,7 +96,7 @@ cargo test -- --nocapture   # see per-test detail
 ```
 
 No local Rust toolchain? Use the wrapper — it compiles the test binary in a Rust
-container and runs it on the host (where `docker` and `localhost:20002` are reachable):
+container and runs it on the host (where `docker` is reachable):
 
 ```bash
 ./run.sh                    # whole matrix
@@ -96,8 +114,9 @@ mint tokens; the CDA must be up for the HTTP checks to pass.
 ### Configuration
 
 Override via environment variables (see `src/lib.rs`): `STACK_DIR`, `CDA_BASE`,
-`CDA_PORT`, `TRUST_DOMAIN`, `SPIFFE_PMC`, `SPIFFE_PROPERTIES`, `SPIFFE_UNKNOWN`,
-`AUD_CDA`, `AUD_WRONG`, `PWT_DATA_PATH`, `EXPIRY_WAIT_SECONDS`.
+`CDA_SOCKET_VOLUME`, `SOVD_CLIENT_USER`, `CURL_IMAGE`, `LOCK_PATH`, `LOCKED_RETRIES`,
+`TRUST_DOMAIN`, `SPIFFE_PMC`, `SPIFFE_PROPERTIES`, `SPIFFE_UNKNOWN`, `AUD_CDA`,
+`AUD_WRONG`, `PWT_DATA_PATH`, `EXPIRY_WAIT_SECONDS`.
 
 ## Expected results
 

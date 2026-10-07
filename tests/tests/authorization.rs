@@ -13,8 +13,9 @@
 
 /*
  * AI assistance: parts of this file were generated with Claude Code (Opus 4.8)
- * and reviewed and verified by the human contributor. All content is
- * contributed under the Apache-2.0 license declared above.
+ * and GitHub Copilot (Claude Opus 5.5) and reviewed and verified by the human
+ * contributor. All content is contributed under the Apache-2.0 license declared
+ * above.
  */
 
 //! Authorization integration matrix against the CDA SOVD HTTP API.
@@ -28,7 +29,6 @@
 
 use std::{thread::sleep, time::Duration};
 
-use reqwest::Method;
 use sdv_integration_tests::*;
 
 // --- Core authorization matrix --------------------------------------------
@@ -45,9 +45,10 @@ fn authorized_write_is_allowed() {
     ensure_variant();
     let token = mint_jwt(&spiffe_pmc(), &aud_cda(), "300s");
     let body = pwt_write_body();
+    // writing data requires an ECU lock held by the same SPIFFE ID
     assert_allow(
         "authorized write (Powertrain_Mode_Write)",
-        request(Method::PUT, &pwt_path(), Some(&token), Some(&body)),
+        locked_write(&token, &pwt_path(), &body),
     );
 }
 
