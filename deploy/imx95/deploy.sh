@@ -57,13 +57,10 @@ scp -q "$config/spire/certs/trusted-certs.pem" "$here/certs/spire-agent-imx95-ce
   "$here/certs/spire-agent-imx95-key.pem" "$BOARD_A:$DEST/config/spire/certs/"
 scp -q "$here/board-a/dozzle-relay-b.service" "$BOARD_A:/etc/systemd/system/"
 scp -q -r "$here/board-a/mosquitto" "$BOARD_A:$DEST/"
-# the PMC's broker password is generated once on the board and kept in $DEST/.env (read by docker compose)
-ssh "$BOARD_A" "set -e; cd $DEST && if [ ! -s mosquitto/passwd ]; then
-    pw=\$(openssl rand -hex 16)
-    docker run --rm --network none -v $DEST/mosquitto:/m eclipse-mosquitto:2 mosquitto_passwd -b -c /m/passwd pmc \$pw
-    chown 1883:1883 mosquitto/passwd && chmod 600 mosquitto/passwd
-    echo STATUS_MQTT_PASSWORD=\$pw > .env && chmod 600 .env
-  fi"
+# broker passwords are generated once on the board and kept in $DEST/.env (read by docker compose)
+ssh "$BOARD_A" "set -e; sh $DEST/mosquitto/add-user.sh pmc STATUS_MQTT_PASSWORD \
+  && sh $DEST/mosquitto/add-user.sh anomaly-detector ANOMALY_MQTT_PASSWORD"
+# SIGHUP makes a running broker reload the password file and ACL
 ssh "$BOARD_A" "chmod 600 $DEST/config/spire/certs/*-key.pem \
   && systemctl daemon-reload && systemctl enable --now dozzle-relay-b.service \
-  && cd $DEST && docker compose up -d"
+  && cd $DEST && docker compose up -d && docker compose kill -s HUP mosquitto"

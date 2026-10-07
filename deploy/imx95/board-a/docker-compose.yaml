@@ -129,3 +129,23 @@ services:
       - ./mosquitto/passwd:/mosquitto/config/passwd:ro
     restart: unless-stopped
   # AI-generated - issue 16: end
+
+  # AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16: begin
+  # flags out-of-range values and sudden changes in the MXChip AZ3166 telemetry
+  anomaly-detector:
+    image: ghcr.io/eclipse-sdv-blueprints/commercial-sdv-stack/anomaly-detector:latest
+    network_mode: host
+    environment:
+      - RUST_LOG=info
+      - MQTT_BROKER_URI=mqtt://127.0.0.1:1883
+      - MQTT_USERNAME=anomaly-detector
+      - MQTT_PASSWORD=${ANOMALY_MQTT_PASSWORD:-}
+    user: "65534:65534"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+  # AI-generated - issue 16: end
