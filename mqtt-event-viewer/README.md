@@ -31,6 +31,7 @@ Common features:
 * Messages are pushed to the browser via Server-Sent Events. New browser sessions first receive the most recent messages (500 by default).
 * Payloads are detected as JSON (pretty printed), text, or binary (hex and Base64, e.g. protobuf encoded uProtocol payloads).
 * Filter by topic (substring or MQTT wildcards like `vehicle/+/#`), search payloads and attributes, and pause or clear the view.
+* The topics panel shows the technologies the viewer is built with and the partner companies (Cummins, Allison Transmission, Vantage Power), linking to their websites. The logos are bundled, so the UI also works without internet access, e.g. on a board's WiFi.
 
 ## How uProtocol over MQTT Works
 
@@ -229,3 +230,18 @@ mvn test
 ```
 
 The tests need no broker: they cover the uProtocol topic and attribute mapping, the HTTP API in both modes and the RPC request validation.
+
+## Third-Party Logos
+
+The logos in [src/main/resources/static/logos](src/main/resources/static/logos) are trademarks of their respective owners and are only used to refer to the technologies.
+
+| File | Source | License |
+|------|--------|---------|
+| `uprotocol.png` | [Eclipse uProtocol](https://github.com/eclipse-uprotocol/.github/tree/main/logo) (`Car_A.png`, cropped and scaled) | Apache-2.0 |
+| `java.svg` | [Simple Icons](https://simpleicons.org) `openjdk`, based on the OpenJDK Duke artwork | BSD-3-Clause |
+| `spring-boot.svg`, `docker.svg`, `mqtt.svg`, `mosquitto.svg` | [Simple Icons](https://simpleicons.org) v16.34.0 | CC0-1.0 |
+| `cummins.svg` | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Cummins_logo.svg), colored in Cummins red | Public domain |
+| `allison.svg` | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Allison_Transmission_logo.svg), editor metadata removed | Public domain |
+| `vantage-power.jpg` | [vantage-power.com](https://www.vantage-power.com) | © Vantage Power, all rights reserved, not covered by Apache-2.0 |
+
+Make sure you have permission to use the Vantage Power logo before publishing it.

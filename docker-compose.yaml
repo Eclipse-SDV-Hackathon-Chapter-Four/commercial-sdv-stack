@@ -218,9 +218,10 @@ services:
     ports:
       - "127.0.0.1:8090:8090"
     environment:
-      - MQTT_BROKER_URI=tcp://mosquitto:1883
-      - MQTT_TOPICS=#
-      # the viewer connects as a uProtocol entity, set UPROTOCOL_ENABLED=false to show raw MQTT messages instead
+      # all MQTT messages on the board's broker (replace <your-mqtt-broker-host> with the actual host), uProtocol messages included;
+      # to show only the stack's uProtocol messages instead, use tcp://mosquitto:1883 and UPROTOCOL_ENABLED=true
+      - MQTT_BROKER_URI=tcp://<your-mqtt-broker-host>:1883
+      - MQTT_TOPICS=# 
       - UP_LOCAL_ADDRESS=up://backend/103AB/1/0
     <<: *unprivileged-workload
     user: "10006:10006"
