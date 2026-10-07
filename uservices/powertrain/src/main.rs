@@ -42,8 +42,13 @@ async fn get_rpc_server(cli: cli::Cli) -> Result<InMemoryRpcServer, Box<dyn std:
     Ok(InMemoryRpcServer::new(transport, uri_provider))
 }
 
-/// Fails closed: only an explicit `true` grants access. A Rego rule that does not match
-/// evaluates to `Undefined` (not `false`), so anything other than `true` must be denied.
+/// Regorous policies can return `Undefined` rather than `false`. A Rego rule that
+/// does not match evaluates to `Undefined` (not `false`), preferred behavior is that anything
+/// other than `true` is denied. Best practice would be to set up rego policy with 
+/// `default allow := false` to ensure a fail-closed behavior. But to be extra cautious, the
+/// `is_authorized` function explicitly checks for `true`.
+/// In practice a separate function may not be needed, but for the sake of this blueprint 
+/// and highlighting this to the user, this function is included.
 fn is_authorized(decision: &regorus::Value) -> bool {
     matches!(decision, regorus::Value::Bool(true))
 }
