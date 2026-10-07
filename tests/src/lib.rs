@@ -13,20 +13,31 @@
 
 /*
  * AI assistance: parts of this file were generated with Claude Code (Opus 4.8)
- * and reviewed and verified by the human contributor. All content is
- * contributed under the Apache-2.0 license declared above.
+ * and GitHub Copilot (Claude Opus 5.5) and reviewed and verified by the human
+ * contributor. All content is contributed under the Apache-2.0 license declared
+ * above.
  */
 
 //! Helpers for the Commercial SDV Stack authorization integration tests.
 //!
-//! The tests drive the CDA SOVD HTTP API (over its Unix domain socket) with JWT-SVIDs minted from
-//! the running `spire-server`, proving that valid attested workloads succeed and
+//! The tests drive the CDA SOVD HTTP API with JWT-SVIDs minted from the running
+//! `spire-server`, proving that valid attested workloads succeed and
 //! unauthorized / forbidden / expired / forged credentials all fail closed.
+//!
+//! The CDA does not listen on any TCP port; its SOVD API is only exposed via a
+//! Unix domain socket in a Docker volume. Requests are therefore sent from a
+//! short-lived curl container that mounts that volume read-only and runs as a
+//! member of the `sovd-clients` group (GID 10100), just like a legitimate client.
 
-use std::{process::Command, sync::Once, time::Duration};
+use std::{
+    io::Write,
+    process::{Command, Output, Stdio},
+    sync::{Once, OnceLock},
+    thread::sleep,
+    time::Duration,
+};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use reqwest::Method;
 
 // ---------------------------------------------------------------------------
 // Configuration (override via environment)
@@ -69,29 +80,31 @@ pub fn aud_cda() -> String {
 pub fn aud_wrong() -> String {
     env_or("AUD_WRONG", "wrong.audience")
 }
-/// Base URL for the CDA SOVD API. The CDA is exposed only over a Unix domain
-/// socket (see [`cda_socket`]); the HTTP host here is used solely for the `Host`
-/// header, matching the PMC's `SOVD_SERVER_BASE_URI`.
+/// Base URI of the SOVD API. The host part is only used for the HTTP `Host`
+/// header, the connection itself goes through the CDA's Unix socket.
 pub fn cda_base() -> String {
     env_or("CDA_BASE", "http://localhost/vehicle/v15")
 }
-/// Path to the CDA SOVD Unix domain socket (shared via the `cda-sovd-socket`
-/// volume). The socket-hardened CDA has no TCP listener, so all requests go
-/// through this socket; the caller must be in the `sovd-clients` group.
-pub fn cda_socket() -> String {
-    env_or("CDA_SOCKET", "/run/cda/cda.sock")
+/// `uid:gid` of the curl client container; GID 10100 (`sovd-clients`) may connect to the CDA socket.
+pub fn sovd_client_user() -> String {
+    env_or("SOVD_CLIENT_USER", "10003:10100")
+}
+pub fn curl_image() -> String {
+    env_or("CURL_IMAGE", "curlimages/curl:8.22.0")
 }
 pub fn pwt_path() -> String {
     env_or("PWT_DATA_PATH", "components/blueprint-ecu/data/powertrain_mode")
 }
+pub fn lock_path() -> String {
+    env_or("LOCK_PATH", "components/blueprint-ecu/locks")
+}
+/// How often a request is retried (1s apart) while the ECU is locked by another
+/// SPIFFE ID (HTTP 423), e.g. by the running Powertrain Mode Controller.
+pub fn locked_retries() -> u32 {
+    env_or("LOCKED_RETRIES", "20").parse().unwrap_or(20)
+}
 pub fn pwt_write_body() -> String {
     env_or("PWT_WRITE_BODY", r#"{"data":{"Mode":"Economy"}}"#)
-}
-/// SOVD lock resource for the ECU. The socket-hardened CDA requires the caller
-/// to hold a lock to write (a lock-less write returns 409 `lock-required`), so
-/// writes acquire one here first, mirroring the PMC.
-pub fn pwt_lock_path() -> String {
-    env_or("PWT_LOCK_PATH", "components/blueprint-ecu/locks")
 }
 
 /// Seconds to wait past a token's `exp` before the expiry check. SPIRE's JWT
@@ -99,13 +112,6 @@ pub fn pwt_lock_path() -> String {
 /// expired by MORE than that before it is rejected. Default 70s.
 pub fn expiry_wait_secs() -> u64 {
     env_or("EXPIRY_WAIT_SECONDS", "70").parse().unwrap_or(70)
-}
-
-/// Max seconds `ensure_variant` polls for the ECU data resource to become
-/// readable before giving up (the SOVD API can answer well before the
-/// downstream ecu-sim/DoIP path resolves a variant). Default 60s.
-pub fn readiness_poll_secs() -> u64 {
-    env_or("READINESS_POLL_SECONDS", "60").parse().unwrap_or(60)
 }
 
 // ---------------------------------------------------------------------------
@@ -183,105 +189,208 @@ pub fn tamper(token: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// HTTP helpers
+// HTTP helpers (SOVD API via the CDA's Unix socket)
 // ---------------------------------------------------------------------------
 
-/// A blocking HTTP client bound to the CDA's Unix domain socket (the CDA has no
-/// TCP listener). Mirrors how the PMC talks to the CDA.
-fn cda_client() -> reqwest::blocking::Client {
-    reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(15))
-        .unix_socket(cda_socket())
-        .build()
-        .expect("build http client")
+#[derive(Clone, Copy, Debug)]
+pub enum Method {
+    GET,
+    PUT,
+    POST,
+    DELETE,
 }
 
-/// Issue a request to the CDA over its Unix domain socket and return the HTTP
-/// status code (0 if unreachable).
-pub fn request(method: Method, path: &str, token: Option<&str>, body: Option<&str>) -> u16 {
-    let url = format!("{}/{}", cda_base(), path);
-    let mut rb = cda_client().request(method, &url);
-    if let Some(t) = token {
-        rb = rb.bearer_auth(t);
-    }
-    if let Some(b) = body {
-        rb = rb.header(reqwest::header::CONTENT_TYPE, "application/json").body(b.to_string());
-    }
-    rb.send().map(|r| r.status().as_u16()).unwrap_or(0)
-}
-
-/// Extract a string field (`"key":"value"`) from a flat JSON body without a
-/// serde dependency. Good enough for the CDA's small lock responses.
-fn json_str_field(body: &str, key: &str) -> Option<String> {
-    let needle = format!("\"{key}\"");
-    let after_key = &body[body.find(&needle)? + needle.len()..];
-    let after_colon = after_key[after_key.find(':')? + 1..].trim_start();
-    let inner = after_colon.strip_prefix('"')?;
-    Some(inner[..inner.find('"')?].to_string())
-}
-
-/// Acquire an exclusive SOVD write lock on the ECU, returning its id. The lock
-/// is scoped to the caller's identity (not the connection). Retries while the
-/// PMC transiently holds the lock (409). Returns None if it can't be acquired.
-pub fn acquire_lock(token: &str) -> Option<String> {
-    let url = format!("{}/{}", cda_base(), pwt_lock_path());
-    for _ in 0..30 {
-        match cda_client()
-            .post(&url)
-            .bearer_auth(token)
-            .header(reqwest::header::CONTENT_TYPE, "application/json")
-            .body(r#"{"lock_expiration":10}"#)
-            .send()
-        {
-            Ok(r) if r.status().as_u16() == 409 => std::thread::sleep(Duration::from_millis(500)),
-            Ok(r) => return r.text().ok().and_then(|t| json_str_field(&t, "id")),
-            Err(_) => std::thread::sleep(Duration::from_millis(500)),
+impl Method {
+    fn as_str(self) -> &'static str {
+        match self {
+            Method::GET => "GET",
+            Method::PUT => "PUT",
+            Method::POST => "POST",
+            Method::DELETE => "DELETE",
         }
     }
-    None
 }
 
-/// Release a previously acquired SOVD lock (best-effort; it also auto-expires).
-pub fn release_lock(token: &str, lock_id: &str) {
-    let url = format!("{}/{}/{}", cda_base(), pwt_lock_path(), lock_id);
-    let _ = cda_client().delete(&url).bearer_auth(token).send();
+#[derive(Debug)]
+pub struct Response {
+    /// HTTP status code, 0 if the CDA could not be reached.
+    pub status: u16,
+    pub body: String,
 }
 
-/// Readiness gate: trigger ECU variant detection and block until an authorized
-/// read actually resolves (2xx), so the whole matrix runs against a fully-ready
-/// stack.
+/// Name of the Docker volume mounted at `mount_point` in the (running)
+/// container of the given Compose service.
+fn service_volume(service: &str, mount_point: &str) -> Option<String> {
+    let out = compose(&["ps", "-q", service]);
+    let id = String::from_utf8_lossy(&out.stdout).lines().next()?.trim().to_string();
+    if id.is_empty() {
+        return None;
+    }
+    let format = format!(
+        "{{{{range .Mounts}}}}{{{{if eq .Destination \"{mount_point}\"}}}}{{{{.Name}}}}{{{{end}}}}{{{{end}}}}"
+    );
+    let out = Command::new("docker")
+        .args(["inspect", "--format", &format, &id])
+        .output()
+        .ok()?;
+    let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (!name.is_empty()).then_some(name)
+}
+
+/// Name of the volume holding the CDA's SOVD Unix socket (override with `CDA_SOCKET_VOLUME`).
+pub fn cda_socket_volume() -> String {
+    static VOLUME: OnceLock<String> = OnceLock::new();
+    VOLUME
+        .get_or_init(|| {
+            std::env::var("CDA_SOCKET_VOLUME")
+                .ok()
+                .or_else(|| service_volume("sovd-cda", "/run/cda"))
+                .expect("cannot determine the CDA socket volume: is the sovd-cda service running? (override with CDA_SOCKET_VOLUME)")
+        })
+        .clone()
+}
+
+/// Escape a value for a double-quoted string in a curl config file.
+fn curl_config_quote(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+/// Send a single request to the CDA, without any retries.
+fn send(method: Method, path: &str, token: Option<&str>, body: Option<&str>) -> Response {
+    let url = format!("{}/{}", cda_base(), path);
+    // Token and body are passed via a curl config on stdin, so tokens do not
+    // show up in the host's process list.
+    let mut config = String::new();
+    if let Some(t) = token {
+        config += &format!("header = {}\n", curl_config_quote(&format!("Authorization: Bearer {t}")));
+    }
+    if let Some(b) = body {
+        config += "header = \"Content-Type: application/json\"\n";
+        config += &format!("data = {}\n", curl_config_quote(b));
+    }
+
+    let mut child = Command::new("docker")
+        .args(["run", "--rm", "-i", "--network", "none", "--user", &sovd_client_user()])
+        .args(["-v", &format!("{}:/run/cda:ro", cda_socket_volume())])
+        .arg(curl_image())
+        .args(["-sS", "--max-time", "15", "--unix-socket", "/run/cda/cda.sock"])
+        .args(["-K", "-", "-w", "\n%{http_code}", "-X", method.as_str(), &url])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to run curl container");
+    child
+        .stdin
+        .take()
+        .expect("curl stdin")
+        .write_all(config.as_bytes())
+        .expect("write curl config");
+    let out = child.wait_with_output().expect("wait for curl container");
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let (body, code) = stdout.rsplit_once('\n').unwrap_or(("", &stdout));
+    let status = code.trim().parse().unwrap_or(0);
+    if status == 0 {
+        eprintln!(
+            "{} {url}: CDA unreachable: {}",
+            method.as_str(),
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
+    }
+    Response { status, body: body.to_string() }
+}
+
+/// Issue a request to the CDA and return the response (status 0 if unreachable).
 ///
-/// The SOVD API starts answering (the CI readiness probe goes green on *any*
-/// response, incl. 401) before the downstream ecu-sim/DoIP path is connected and
-/// a variant is detected. Until then every data read/write returns 404/5xx
-/// regardless of the credential, which fails *every* test -- ALLOW and DENY
-/// alike (a forbidden token on an unresolved resource 404s instead of 403).
-/// Polling an authorized read here closes that race.
+/// The CDA checks ECU locks *before* the Rego authorization, so while another
+/// SPIFFE ID (e.g. the running Powertrain Mode Controller) briefly holds the
+/// ECU lock, any other identity gets `423 Locked`. Such requests are retried,
+/// so that the tests exercise the authorization decision. A persistent 423 is
+/// returned as is, which fails both ALLOW and DENY assertions.
+pub fn sovd(method: Method, path: &str, token: Option<&str>, body: Option<&str>) -> Response {
+    let mut response = send(method, path, token, body);
+    for _ in 0..locked_retries() {
+        if response.status != 423 {
+            break;
+        }
+        sleep(Duration::from_secs(1));
+        response = send(method, path, token, body);
+    }
+    response
+}
+
+/// Issue a request to the CDA and return the HTTP status code (0 if unreachable).
+pub fn request(method: Method, path: &str, token: Option<&str>, body: Option<&str>) -> u16 {
+    sovd(method, path, token, body).status
+}
+
+/// An ECU lock held by the SPIFFE ID of `token`, released again on drop.
+pub struct EcuLock {
+    token: String,
+    id: String,
+}
+
+impl EcuLock {
+    /// Acquire the ECU lock, returning the HTTP status code on failure.
+    pub fn acquire(token: &str, expiration_secs: u64) -> Result<Self, u16> {
+        let body = format!(r#"{{"lock_expiration": {expiration_secs}}}"#);
+        let response = sovd(Method::POST, &lock_path(), Some(token), Some(&body));
+        if !(200..300).contains(&response.status) {
+            return Err(response.status);
+        }
+        let id = serde_json::from_str::<serde_json::Value>(&response.body)
+            .ok()
+            .and_then(|lock| lock["id"].as_str().map(str::to_string))
+            .ok_or(response.status)?;
+        Ok(EcuLock { token: token.to_string(), id })
+    }
+}
+
+impl Drop for EcuLock {
+    fn drop(&mut self) {
+        let _ = send(Method::DELETE, &format!("{}/{}", lock_path(), self.id), Some(&self.token), None);
+    }
+}
+
+/// Write `body` to `path` while holding the ECU lock and return the status code
+/// of the write (or of the failed lock acquisition).
 ///
-/// Guarded by `Once` and called at the top of every test, so the first test to
-/// run performs the wait and gates the rest; later calls are a cheap no-op. If
-/// the stack never becomes ready we fall through rather than panic, so each
-/// assertion still fails loudly with its actual status code.
+/// Locks are owned per SPIFFE ID. The running Powertrain Mode Controller shares
+/// its SPIFFE ID with the tokens minted for it, so it may release the lock
+/// between our lock and write requests (the write then fails with
+/// `409 Conflict`). In that case the lock is acquired again and the write retried.
+pub fn locked_write(token: &str, path: &str, body: &str) -> u16 {
+    let mut status = 0;
+    for _ in 0..5 {
+        status = match EcuLock::acquire(token, 30) {
+            Ok(_lock) => sovd(Method::PUT, path, Some(token), Some(body)).status,
+            Err(lock_status) => lock_status,
+        };
+        if (200..300).contains(&status) {
+            break;
+        }
+        sleep(Duration::from_secs(1));
+    }
+    status
+}
+
+/// Best-effort trigger of ECU variant detection so reads/writes resolve a
+/// variant. The result is intentionally ignored: the CDA caches variant
+/// detection globally, so this is usually a no-op. If a variant genuinely
+/// cannot be resolved, reads/writes return 404 and the ALLOW tests fail loudly
+/// (never a silent pass), so this helper is a convenience, not a guarantee.
 pub fn ensure_variant() {
     static VARIANT: Once = Once::new();
     VARIANT.call_once(|| {
-        let token = mint_jwt(&spiffe_pmc(), &aud_cda(), "300s");
-        for _ in 0..readiness_poll_secs() {
-            // Re-trigger variant detection, then probe a real authorized read.
-            let _ = request(Method::PUT, "components/blueprint-ecu", Some(&token), None);
-            if (200..300).contains(&request(Method::GET, &pwt_path(), Some(&token), None)) {
-                return;
-            }
-            std::thread::sleep(Duration::from_secs(1));
-        }
+        let token = mint_jwt(&spiffe_pmc(), &aud_cda(), "120s");
+        let _ = request(Method::PUT, "components/blueprint-ecu", Some(&token), None);
     });
 }
 
 // ---------------------------------------------------------------------------
 // Stack control (used by the #[ignore]d stateful tests in offline.rs)
 // ---------------------------------------------------------------------------
-
-use std::process::Output;
 
 /// Run `docker compose <args>` in the stack directory.
 pub fn compose(args: &[&str]) -> Output {
@@ -310,15 +419,10 @@ pub fn wait_spire_ready(max_secs: u64) {
 
 /// Name of the vehicle SPIRE agent's Workload API socket volume.
 pub fn vehicle_socket_volume() -> String {
-    let out = Command::new("docker")
-        .args(["volume", "ls", "--format", "{{.Name}}"])
-        .output()
-        .expect("docker volume ls");
-    String::from_utf8_lossy(&out.stdout)
-        .lines()
-        .find(|l| l.ends_with("spire-agent-vehicle-socket"))
-        .unwrap_or("commercial-sdv-stack_spire-agent-vehicle-socket")
-        .to_string()
+    // Resolve via the running agent container: matching on the volume name alone
+    // may pick up the volume of another Compose project on the same Docker host.
+    service_volume("spire-agent-vehicle", "/run/spire/agent/public")
+        .unwrap_or_else(|| "commercial-sdv-stack_spire-agent-vehicle-socket".to_string())
 }
 
 /// Try to fetch a JWT-SVID from a rogue container (an unregistered image) that

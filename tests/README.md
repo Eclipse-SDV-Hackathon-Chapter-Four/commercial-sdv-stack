@@ -11,8 +11,9 @@ https://www.apache.org/licenses/LICENSE-2.0
 SPDX-License-Identifier: Apache-2.0
 
 AI assistance: parts of this file were generated with Claude Code (Opus 4.8)
-and reviewed and verified by the human contributor. All content is
-contributed under the Apache-2.0 license declared above.
+and GitHub Copilot (Claude Opus 5.5) and reviewed and verified by the human
+contributor. All content is contributed under the Apache-2.0 license declared
+above.
 -->
 
 # Integration Tests — Authorization Guarantees
@@ -31,17 +32,14 @@ against a required audience via the SPIRE Agent Workload API, then apply an
 
 | Enforcement point | Surface | Required audience | Rego decision | Allowed |
 | --- | --- | --- | --- | --- |
-| `sovd-cda` | SOVD/REST over a Unix domain socket | `sovd.cda` | `service_name ∈ allowed_services[spiffe_id]` | `…/vehicle/powertrain-mode-controller` → `Powertrain_Mode_Read`, `Powertrain_Mode_Write` |
+| `sovd-cda` | HTTP (SOVD/REST) via Unix socket `/run/cda/cda.sock` | `sovd.cda` | `service_name ∈ allowed_services[spiffe_id]` | `…/vehicle/powertrain-mode-controller` → `Powertrain_Mode_Read`, `Powertrain_Mode_Write` |
 | `powertrain-mode-controller` | uProtocol RPC (MQTT) | `powertrain.mode-control` | `method_id ∈ allowed_method_ids[spiffe_id]` | `…/backend/fms` → methods `1`, `2` |
 
-**This suite drives the CDA SOVD enforcement point.** It is the ideal test surface: it
+**This suite drives the CDA HTTP enforcement point.** It is the ideal test surface: it
 exercises *both* the audience check and the Rego check, it is plain HTTP + Bearer token,
 and every scenario can be produced deterministically by minting JWT-SVIDs from the
-running `spire-server`. The CDA is socket-hardened — its SOVD API is exposed only over a
-Unix domain socket reachable by the `sovd-clients` group (no TCP listener) — so the suite
-talks to it over that socket, exactly as the `powertrain-mode-controller` does. The
-uProtocol path uses the identical Rego pattern and is covered by the demo flow (see
-[Not yet automated](#not-yet-automated)).
+running `spire-server`. The uProtocol path uses the identical Rego pattern and is covered
+by the demo flow (see [Not yet automated](#not-yet-automated)).
 
 ### How the matrix is produced
 
@@ -54,9 +52,24 @@ Attestation is covered separately (see [Not yet automated](#not-yet-automated)).
 This is a standalone Cargo crate at the **commercial-sdv-stack root** (`tests/`), next
 to `docker-compose.yaml`. It is deliberately **not** a member of the `uservices`
 workspace, so it never pulls in the musl/cross build — it just drives the running stack.
-The crate shells out to `docker compose exec spire-server ...` to mint tokens and uses
-`reqwest` (over the CDA's Unix domain socket) to call the CDA. Override the stack location
-with `STACK_DIR=...` if needed.
+The crate shells out to `docker compose exec spire-server ...` to mint tokens. The CDA
+does not listen on any TCP port, so every SOVD request is sent from a short-lived
+`curlimages/curl` container that mounts the CDA's socket volume read-only and runs as
+`10003:10100`, i.e. as a member of the `sovd-clients` group, just like a legitimate client
+(see [Securing Access to the CDA](../README.md#securing-access-to-the-cda)). The volume is
+looked up from the running `sovd-cda` container. Override the stack location with
+`STACK_DIR=...` if needed.
+
+Two properties of the CDA's ECU locks are handled by the suite:
+
+- Writing data requires an ECU lock held by the same SPIFFE ID, so the write test acquires
+  the lock first and releases it afterwards. Locks are owned per SPIFFE ID, so the running
+  Powertrain Mode Controller (same identity) may release it in between; the write is then
+  retried.
+- The CDA checks locks *before* the Rego authorization: while the Powertrain Mode
+  Controller briefly holds the lock, every other identity gets `423 Locked` instead of the
+  authorization decision. Such requests are retried (`LOCKED_RETRIES`, 1s apart); a
+  persistent `423` fails the test.
 
 ## Prerequisites
 
@@ -70,37 +83,40 @@ docker compose --profile infra --profile powertrain up -d --build
 scripts/register_workloads.sh
 ```
 
-Needs a running `docker` daemon. Because the CDA is reachable only over a Unix domain
-socket owned by the `sovd-clients` group, the suite runs **inside a container** that joins
-that group and mounts the socket volume — so there is no host `cargo`/`:20002` dependency.
+Needs a Rust toolchain (`cargo`) plus a running `docker` daemon. The suite reaches the
+CDA via its Unix socket in the `sovd-cda` service's `/run/cda` volume (pulling
+`curlimages/curl` on first use).
 
 ## Running
 
-Use the wrapper from the `tests/` directory. It builds one image (Rust + Docker CLI),
-compiles the test binaries in it, then runs each binary in a container that mounts the
-CDA socket volume, joins the `sovd-clients` group, and mounts the Docker socket (the tests
-mint JWT-SVIDs and drive the stack via `docker compose`):
-
 ```bash
-./run.sh --include-ignored --test-threads=1   # full matrix incl. stateful offline tests
-./run.sh                                       # default matrix (offline tests are #[ignore]d)
-./run.sh --skip expired                        # skip the slow ~70s expiry check
-./run.sh --nocapture                           # see per-test detail
+cd tests
+cargo test                  # runs the whole matrix; exit code non-zero on any failure
+cargo test -- --nocapture   # see per-test detail
 ```
 
-Output is libtest's pass/fail report (one line per `#[test]`, summarised at the end) —
-suitable for CI and presentation. `spire-server` must be running for the suite to mint
-tokens, and `sovd-cda` must be healthy (its SOVD socket ready) for the checks to pass.
+No local Rust toolchain? Use the wrapper — it compiles the test binary in a Rust
+container and runs it on the host (where `docker` is reachable):
+
+```bash
+./run.sh                    # whole matrix
+./run.sh --skip expired     # skip the slow ~70s expiry check
+```
+
+`cargo test` output is the pass/fail report (one line per `#[test]`, summarised at the
+end) — suitable for CI and presentation. `spire-server` must be running for the suite to
+mint tokens; the CDA must be up for the HTTP checks to pass.
 
 > **Note:** `expired_token_is_denied` sleeps ~70s (past SPIRE's clock-skew leeway, see
-> below). Skip the slow path during quick iteration with `./run.sh --skip expired`.
+> below). Skip the slow path during quick iteration with
+> `cargo test -- --skip expired`.
 
 ### Configuration
 
 Override via environment variables (see `src/lib.rs`): `STACK_DIR`, `CDA_BASE`,
-`CDA_SOCKET`, `TRUST_DOMAIN`, `SPIFFE_PMC`, `SPIFFE_PROPERTIES`, `SPIFFE_UNKNOWN`,
-`AUD_CDA`, `AUD_WRONG`, `PWT_DATA_PATH`, `EXPIRY_WAIT_SECONDS`, `READINESS_POLL_SECONDS`.
-`run.sh` also honours `SOVD_SOCKET_VOLUME` and `SOVD_CLIENTS_GID` for the socket mount.
+`CDA_SOCKET_VOLUME`, `SOVD_CLIENT_USER`, `CURL_IMAGE`, `LOCK_PATH`, `LOCKED_RETRIES`,
+`TRUST_DOMAIN`, `SPIFFE_PMC`, `SPIFFE_PROPERTIES`, `SPIFFE_UNKNOWN`, `AUD_CDA`,
+`AUD_WRONG`, `PWT_DATA_PATH`, `EXPIRY_WAIT_SECONDS`.
 
 ## Expected results
 
