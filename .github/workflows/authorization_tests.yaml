@@ -38,6 +38,7 @@ on:
     branches:
       - main
       - hackathon
+  workflow_call:
   workflow_dispatch:
 
 # Only the latest run per ref needs to finish; cancel superseded ones.

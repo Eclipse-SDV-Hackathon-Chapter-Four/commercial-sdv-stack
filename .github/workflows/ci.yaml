@@ -31,3 +31,13 @@ jobs:
   check-dependencies:
     name: Check 3rd party dependencies
     uses: ./.github/workflows/check-dependencies.yaml
+
+  authorization-tests:
+    name: Authorization integration tests
+    uses: ./.github/workflows/authorization_tests.yaml
+    # The called workflow self-seeds uService images to GHCR on a cache miss,
+    # so it needs packages:write and the inherited GITHUB_TOKEN/actor context.
+    permissions:
+      contents: read
+      packages: write
+    secrets: inherit
