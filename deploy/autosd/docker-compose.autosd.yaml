@@ -1,0 +1,42 @@
+#
+# SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+# SPDX-License-Identifier: Apache-2.0
+#
+# AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
+#
+# Used on top of deploy/imx95/docker-compose.mac.yaml inside the AutoSD VM, which is reachable
+# only through the port forwards set up by vm.sh.
+
+services:
+  spire-server:
+    ports: !override
+      - "8081:8081"
+  mosquitto:
+    ports: !override
+      - "1883:1883"
+  ntp:
+    ports: !override
+      - "123:123/udp"
+  dozzle:
+    ports: !override
+      - "8080:8080"
+    # a symlinked /var/run/docker.sock would be mounted as a dangling link
+    volumes:
+      - /run/podman/podman.sock:/var/run/docker.sock
+    # SELinux keeps containers from connecting to the Podman socket
+    security_opt:
+      - label=disable
+  databroker:
+    ports: !override
+      - "55555:55555"
+  # the docker workload attestor detects Podman containers and uses its socket path
+  spire-agent-backend:
+    volumes:
+      - /run/podman/podman.sock:/run/podman/podman.sock
+    security_opt:
+      - label=disable
+  spire-agent-vehicle:
+    volumes:
+      - /run/podman/podman.sock:/run/podman/podman.sock
+    security_opt:
+      - label=disable

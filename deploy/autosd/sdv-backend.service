@@ -1,0 +1,23 @@
+#
+# SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+# SPDX-License-Identifier: Apache-2.0
+#
+# AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
+#
+# Starts the backend at boot of the AutoSD VM; podman-restart.service only handles
+# restart: always, the compose services use unless-stopped. The VM has no RTC, so it waits for
+# chrony (chrony-wait.service) to keep SPIRE from issuing certificates with a wrong time.
+
+[Unit]
+Description=SDV backend containers
+Requires=podman.socket
+After=podman.socket network-online.target time-sync.target
+Wants=network-online.target time-sync.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/sdv-backend/deploy/autosd/start.sh
+
+[Install]
+WantedBy=multi-user.target
