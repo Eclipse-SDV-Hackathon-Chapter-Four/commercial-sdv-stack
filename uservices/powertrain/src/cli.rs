@@ -11,7 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use std::{str::FromStr, sync::Arc, time::Duration};
+// AI-modified (GitHub Copilot, Claude Opus 5.5) - issue 7: added PathBuf
+use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
@@ -51,6 +52,13 @@ pub(crate) struct Cli {
         },
     )]
     sovd_server_base_uri: url::Url,
+    // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
+    /// The path of a Unix domain socket to use for connecting to the SOVD server.
+    /// If set, all SOVD requests are sent via this socket and the host part of the
+    /// SOVD server base URI is only used for the HTTP Host header.
+    #[arg(long, value_name = "PATH", env = "SOVD_SERVER_UNIX_SOCKET")]
+    sovd_server_unix_socket: Option<PathBuf>,
+    // AI-generated - issue 7: end
     /// The resource path on the SOVD server that is used to set the powertrain mode.
     /// This value will be appended to the SOVD server's base URI to form the full URL.
     /// Must be a relative path (i.e. must not start with a slash).
@@ -68,6 +76,26 @@ pub(crate) struct Cli {
         }
     )]
     sovd_powertrain_mode_resource_path: String,
+    // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
+    /// The resource path on the SOVD server that is used to acquire a lock on the powertrain ECU
+    /// before setting the powertrain mode.
+    /// This value will be appended to the SOVD server's base URI to form the full URL.
+    /// Must be a relative path (i.e. must not start with a slash).
+    #[arg(
+        long,
+        value_name = "PATH",
+        env = "SOVD_POWERTRAIN_LOCK_RESOURCE_PATH",
+        default_value = "components/blueprint-ecu/locks",
+        value_parser = |s: &str| {
+            if s.starts_with('/') {
+                Err(String::from("resource path must be a relative path and must not start with a slash"))
+            } else {
+                Ok(s.to_string())
+            }
+        }
+    )]
+    sovd_powertrain_lock_resource_path: String,
+    // AI-generated - issue 7: end
     #[command(flatten)]
     pub opa_config: common::open_policy_agent::OpaConfig,
     #[command(subcommand)]
@@ -90,12 +118,27 @@ impl Cli {
         &self.sovd_server_base_uri
     }
 
+    // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
+    pub(crate) fn get_sovd_server_unix_socket(&self) -> Option<&PathBuf> {
+        self.sovd_server_unix_socket.as_ref()
+    }
+    // AI-generated - issue 7: end
+
     pub(crate) fn get_sovd_powertrain_mode_resource_url(
         &self,
     ) -> Result<url::Url, url::ParseError> {
         self.sovd_server_base_uri
             .join(&self.sovd_powertrain_mode_resource_path)
     }
+
+    // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
+    pub(crate) fn get_sovd_powertrain_lock_resource_url(
+        &self,
+    ) -> Result<url::Url, url::ParseError> {
+        self.sovd_server_base_uri
+            .join(&self.sovd_powertrain_lock_resource_path)
+    }
+    // AI-generated - issue 7: end
 
     pub(crate) fn get_local_uri_provider(
         &self,
