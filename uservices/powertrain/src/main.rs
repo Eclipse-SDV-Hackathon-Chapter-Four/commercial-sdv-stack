@@ -41,18 +41,39 @@ pub(crate) struct Root {
     data: ModeMessage,
 }
 
+// AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
+// Safety net so that a lock is not held forever if releasing it fails.
+const SOVD_LOCK_EXPIRATION_SECS: u64 = 10;
+
+#[derive(Debug, serde::Deserialize)]
+struct SovdLock {
+    id: String,
+}
+// AI-generated - issue 7: end
+
 struct CurrentModeController {
     http_client: reqwest::Client,
     powertrain_sovd_url: Url,
+    // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 7
+    powertrain_lock_url: Url,
     workload_api: WorkloadApiClient,
     authorization_policy: CompiledPolicy,
 }
 
 impl CurrentModeController {
     async fn new(cli: &Cli) -> Result<Self, Box<dyn std::error::Error>> {
+        // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
+        let mut http_client_builder = reqwest::Client::builder();
+        if let Some(socket_path) = cli.get_sovd_server_unix_socket() {
+            http_client_builder = http_client_builder.unix_socket(socket_path.as_path());
+        }
+        // AI-generated - issue 7: end
         Ok(Self {
-            http_client: reqwest::Client::builder().build()?,
+            // AI-modified (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
+            http_client: http_client_builder.build()?,
             powertrain_sovd_url: cli.get_sovd_powertrain_mode_resource_url()?,
+            powertrain_lock_url: cli.get_sovd_powertrain_lock_resource_url()?,
+            // AI-modified - issue 7: end
             workload_api: WorkloadApiClient::connect_env().await?,
             authorization_policy: cli.opa_config.get_compiled_auth_policy()?,
         })
@@ -122,6 +143,72 @@ impl CurrentModeController {
             })
     }
 
+    // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
+    async fn acquire_lock(&self, svid: &JwtSvid) -> Result<String, ServiceInvocationError> {
+        let response = self
+            .http_client
+            .post(self.powertrain_lock_url.clone())
+            .bearer_auth(svid.token())
+            .json(&serde_json::json!({ "lock_expiration": SOVD_LOCK_EXPIRATION_SECS }))
+            .send()
+            .await
+            .map_err(|e| {
+                warn!("Error communicating with SOVD server: {e}");
+                ServiceInvocationError::Unavailable("Cannot lock powertrain ECU".to_string())
+            })?;
+        if !response.status().is_success() {
+            warn!(
+                "Failed to lock powertrain ECU, SOVD server responded with status code {}",
+                response.status()
+            );
+            return Err(ServiceInvocationError::Unavailable(
+                "Cannot lock powertrain ECU".to_string(),
+            ));
+        }
+        response
+            .json::<SovdLock>()
+            .await
+            .map(|lock| {
+                debug!("Acquired SOVD lock on powertrain ECU [id: {}]", lock.id);
+                lock.id
+            })
+            .map_err(|e| {
+                warn!("Error parsing lock response from SOVD server: {e}");
+                ServiceInvocationError::Internal("internal error".to_string())
+            })
+    }
+
+    async fn release_lock(&self, svid: &JwtSvid, lock_id: &str) {
+        let mut lock_url = self.powertrain_lock_url.clone();
+        if lock_url
+            .path_segments_mut()
+            .map(|mut segments| {
+                segments.push(lock_id);
+            })
+            .is_err()
+        {
+            warn!("Cannot create URL for releasing SOVD lock [id: {lock_id}]");
+            return;
+        }
+        match self
+            .http_client
+            .delete(lock_url)
+            .bearer_auth(svid.token())
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => {
+                debug!("Released SOVD lock on powertrain ECU [id: {lock_id}]");
+            }
+            Ok(response) => warn!(
+                "Failed to release SOVD lock [id: {lock_id}], SOVD server responded with status code {}",
+                response.status()
+            ),
+            Err(e) => warn!("Error releasing SOVD lock [id: {lock_id}]: {e}"),
+        }
+    }
+    // AI-generated - issue 7: end
+
     async fn get_current_mode(&self) -> Result<Option<UPayload>, ServiceInvocationError> {
         let svid = self.fresh_svid().await?;
         let response = self
@@ -184,17 +271,21 @@ impl CurrentModeController {
         let request_payload = Root {
             data: mode_message.clone(),
         };
-        let response = self
+        // AI-modified (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
+        let lock_id = self.acquire_lock(&svid).await?;
+        let result = self
             .http_client
             .put(self.powertrain_sovd_url.clone())
             .bearer_auth(svid.token())
             .json(&request_payload)
             .send()
-            .await
-            .map_err(|e| {
-                warn!("Error communicating with SOVD server: {e}");
-                ServiceInvocationError::Unavailable("Cannot set current mode".to_string())
-            })?;
+            .await;
+        self.release_lock(&svid, &lock_id).await;
+        let response = result.map_err(|e| {
+            warn!("Error communicating with SOVD server: {e}");
+            ServiceInvocationError::Unavailable("Cannot set current mode".to_string())
+        })?;
+        // AI-modified - issue 7: end
         if !response.status().is_success() {
             warn!(
                 "Failed to set powertrain mode, SOVD server responded with status code {}",
@@ -236,6 +327,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
     let cli = cli::Cli::parse();
     let sovd_server_uri = cli.get_sovd_server_uri().to_owned();
+    // AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
+    let sovd_server_unix_socket = cli
+        .get_sovd_server_unix_socket()
+        .map_or_else(|| String::from("none"), |p| p.display().to_string());
+    // AI-generated - issue 7: end
     let mode_controller = CurrentModeController::new(&cli).await.map(Arc::new)?;
 
     let rpc_server = get_rpc_server(cli).await?;
@@ -253,9 +349,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             mode_controller,
         )
         .await?;
+    // AI-modified (GitHub Copilot, Claude Opus 5.5) - issue 7: log the Unix socket
     info!(
-        "Powertrain mode control service is running [SOVD CDA Server: {}]",
-        sovd_server_uri
+        "Powertrain mode control service is running [SOVD CDA Server: {}, Unix socket: {}]",
+        sovd_server_uri, sovd_server_unix_socket
     );
     tokio::signal::ctrl_c().await?;
     info!("Powertrain mode control service is shutting down");
