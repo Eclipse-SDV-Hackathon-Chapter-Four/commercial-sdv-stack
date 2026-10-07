@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+# SPDX-License-Identifier: Apache-2.0
+# AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
+# installed by ap.sh as /etc/systemd/network/30-uap0.network; there is no internet behind the access
+# point, board A itself serves DNS (systemd-resolved) and NTP (ntpd) to its clients
+
+[Match]
+Name=uap0
+
+[Network]
+Address=192.168.60.1/24
+DHCPServer=yes
+ConfigureWithoutCarrier=yes
+
+[DHCPServer]
+PoolOffset=100
+PoolSize=50
+EmitDNS=yes
+DNS=192.168.60.1
+EmitNTP=yes
+NTP=192.168.60.1

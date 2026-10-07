@@ -10,9 +10,12 @@ delete table inet sdv_wifi
 table inet sdv_wifi {
 	chain input {
 		type filter hook input priority filter; policy accept;
-		iifname != "mlan0" accept
+		# AI-modified (GitHub Copilot, Claude Opus 5.5) - issue 16: also the uap0 access point (ap.sh)
+		iifname != { "mlan0", "uap0" } accept
 		ct state established,related accept
 		udp sport 67 udp dport 68 accept
+		iifname "uap0" udp dport { 53, 67, 123 } accept
+		iifname "uap0" tcp dport 53 accept
 		meta l4proto { icmp, ipv6-icmp } accept
 		udp dport 5353 accept
 		tcp dport 1883 accept

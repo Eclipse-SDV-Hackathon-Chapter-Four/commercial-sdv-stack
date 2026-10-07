@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+# SPDX-License-Identifier: Apache-2.0
+# AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 16
+# installed by ap.sh as /etc/systemd/system/sdv-wifi-ap.service; the radio can only use one channel,
+# so the access point replaces the Wi-Fi client
+
+[Unit]
+Description=Wi-Fi access point for the MXChip AZ3166 (uap0)
+BindsTo=sys-subsystem-net-devices-uap0.device
+After=sys-subsystem-net-devices-uap0.device sdv-wifi-firewall.service
+Requires=sdv-wifi-firewall.service
+Conflicts=wpa_supplicant@mlan0.service
+
+[Service]
+ExecStart=/usr/sbin/hostapd /etc/sdv-wifi-ap.conf
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
