@@ -1,3 +1,5 @@
+<!-- Portions of this file were generated with AI assistance (Github Copilot, Claude Opus 5.5). -->
+
 # Commercial Vehicle Use Cases based on Eclipse SDV Software Components
 
 This repository contains artifacts that implement a few use cases that are (not exclusively) relevant for commercial vehicles.
@@ -37,6 +39,29 @@ scripts/register_workloads.sh
 ```
 
 After successful workload registration, the use cases can be run as described in the following sections.
+
+### Protecting the SPIFFE Workload API
+
+Workloads trust that the Unix domain socket `/tmp/spire-agent/public/api.sock` leads to the genuine local SPIRE agent.
+To keep that assumption valid, the Docker Compose files enforce the following:
+
+- Only the SPIRE agents mount their socket volume (`spire-agent-backend-socket`, `spire-agent-vehicle-socket`) read-write, so only they can create, replace or remove the socket.
+- Workloads mount the socket volume read-only and with `nocopy`, so they can connect to the socket but cannot replace it or seed the volume with content from their image.
+- Workloads run as dedicated non-root users, drop all Linux capabilities and cannot gain new privileges.
+- Only trusted infrastructure (the SPIRE agents for workload attestation and Dozzle) mounts the Docker socket. Note that mounting `docker.sock` read-only does not make the Docker API read-only.
+
+These rules can be checked without starting any containers by running:
+
+```bash
+scripts/check_socket_hardening.sh
+```
+
+Once the stack is running, the following command additionally verifies the live containers: each workload's socket directory refuses writes, and each workload can still reach its SPIRE agent.
+The optional `--agent-restart` flag also restarts each SPIRE agent and verifies that the workloads reach the recreated socket without being restarted themselves:
+
+```bash
+scripts/check_socket_hardening.sh --runtime [--agent-restart]
+```
 
 ## Run the Deploy Firmware Use Case
 
@@ -142,6 +167,39 @@ sequenceDiagram
 
 **Note** The ECU Updater in this example use case does not actually deploy any firmware images to any ECU but only maintains some state in memory. In a future extension of the blueprint, the OpenSOVD CDA server might be used to actually perform an ECU update via UDS.
 
+## Building Behind a TLS-Intercepting Proxy
+
+The local Rust and ECU simulator Dockerfiles accept an optional BuildKit secret
+named `proxy_ca`. Export your organization's trusted root CA as a PEM certificate
+to `config/proxy/ca-cert.crt`, then create `docker-compose.override.yaml`:
+
+```yaml
+services:
+  fms:
+    build: &proxy_build
+      secrets: [proxy_ca]
+  vehicle-properties:
+    build: *proxy_build
+  powertrain-mode-controller:
+    build: *proxy_build
+  sovd-cda:
+    build: *proxy_build
+  ecu-sim:
+    build: *proxy_build
+secrets:
+  proxy_ca:
+    file: ./config/proxy/ca-cert.crt
+```
+
+Compose loads this override automatically. Both local files are ignored by Git.
+The CA is installed in the containers' OS trust stores and, for Java, the JVM
+trust stores; TLS verification remains enabled. Builds without the secret retain
+their default trust stores. After rotating the certificate, rebuild with
+`docker compose --profile infra --profile powertrain build --no-cache` because
+BuildKit does not invalidate its cache when secret contents change.
+
+This configures container trust, not Docker daemon trust for image pulls.
+
 ## Run the Set Powertrain Mode Use Case
 
 In this use case, a Fleet Management System in the backend uses the _Powertrain Mode Controller_ uService on the vehicle to cycle the vehicle's powertrain through all supported modes.
@@ -157,6 +215,8 @@ Start the required components and services by running:
 # Using the default Docker Compose file in the top level folder:
 docker compose --profile infra --profile powertrain up -d
 ```
+
+**Note** The `fms`, `vehicle-properties`, `powertrain-mode-controller`, `sovd-cda` and `ecu-sim` images are always built from the local sources (`pull_policy: build`), so `up` rebuilds them whenever their sources have changed and takes unchanged images from the build cache. After pulling new changes, run the command above again to rebuild the images and recreate the affected containers.
 
 The setting of the powertrain mode can be traced through the system by means of the container logs, which you can examine in the Dozzle console.
 
@@ -207,6 +267,23 @@ sequenceDiagram
 2. The _Powertrain Mode Controller_ sets the powertrain mode to _Economy_ by acquiring a short-lived lock on the ECU and updating the corresponding SOVD entity's data value by means of an HTTP PUT request on the _CDA Server_ (via the CDA's Unix domain socket). The lock is released again afterwards.
 <!-- AI-modified - issue 7: end -->
 3. The _CDA Server_ sets the powertrain mode to _Economy_ by means of invoking the _Powertrain_Mode_Write_ operation on the _Blueprint ECU_ via UDS.
+
+### Authorization Integration Tests
+
+A standalone Cargo crate in [`tests/`](tests/) verifies the stack's authorization model end to end: valid attested workloads succeed, while unauthorized identities, forbidden operations, wrong audiences, and expired or forged credentials all fail closed.
+
+With the stack running and the workloads registered:
+
+```bash
+# From the repository root folder
+docker compose --profile infra --profile powertrain up -d --build
+scripts/register_workloads.sh
+
+cd tests
+cargo test            # runs the whole matrix (use ./run.sh if you have no local Rust toolchain)
+```
+
+See [tests/README.md](tests/README.md) for the full scenario matrix and characterization notes.
 
 ### What's in the Box?
 
