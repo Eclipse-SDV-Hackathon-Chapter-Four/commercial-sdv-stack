@@ -677,7 +677,7 @@ dependencies = [
 [[package]]
 name = "cda-build"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "rustversion",
 ]
@@ -685,7 +685,7 @@ dependencies = [
 [[package]]
 name = "cda-comm-can"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "async-trait",
  "cda-interfaces",
@@ -702,7 +702,7 @@ dependencies = [
 [[package]]
 name = "cda-comm-doip"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "async-trait",
  "cda-interfaces",
@@ -723,7 +723,7 @@ dependencies = [
 [[package]]
 name = "cda-comm-uds"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "async-trait",
  "cda-build",
@@ -740,7 +740,7 @@ dependencies = [
 [[package]]
 name = "cda-core"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "async-trait",
  "cda-build",
@@ -761,7 +761,7 @@ dependencies = [
 [[package]]
 name = "cda-database"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "bytes",
  "cargo_toml",
@@ -786,7 +786,7 @@ dependencies = [
 [[package]]
 name = "cda-health"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "aide",
  "async-trait",
@@ -804,7 +804,7 @@ dependencies = [
 [[package]]
 name = "cda-interfaces"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "async-trait",
  "bytes",
@@ -829,7 +829,7 @@ dependencies = [
 [[package]]
 name = "cda-plugin-communication-management"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "async-trait",
  "cda-interfaces",
@@ -841,9 +841,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cda-plugin-lock-priority"
+version = "0.1.0"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
+dependencies = [
+ "async-trait",
+ "cda-interfaces",
+]
+
+[[package]]
 name = "cda-plugin-runtime-update"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "async-trait",
  "bytes",
@@ -865,7 +874,7 @@ dependencies = [
 [[package]]
 name = "cda-plugin-security"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "aide",
  "async-trait",
@@ -886,7 +895,7 @@ dependencies = [
 [[package]]
 name = "cda-sovd"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "aide",
  "async-trait",
@@ -897,8 +906,10 @@ dependencies = [
  "cda-comm-doip",
  "cda-interfaces",
  "cda-plugin-communication-management",
+ "cda-plugin-lock-priority",
  "cda-plugin-security",
  "chrono",
+ "futures",
  "http",
  "indexmap 2.14.2",
  "mime",
@@ -921,7 +932,7 @@ dependencies = [
 [[package]]
 name = "cda-storage"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "async-trait",
  "cda-interfaces",
@@ -937,7 +948,7 @@ dependencies = [
 [[package]]
 name = "cda-tracing"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "cda-build",
  "nu-ansi-term",
@@ -960,7 +971,7 @@ dependencies = [
 [[package]]
 name = "cda-transport-router"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "async-trait",
  "cda-interfaces",
@@ -3446,7 +3457,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 [[package]]
 name = "opensovd-axum-extra"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "aide",
  "axum",
@@ -3457,7 +3468,7 @@ dependencies = [
 [[package]]
 name = "opensovd-cda"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "async-trait",
  "backon",
@@ -3469,6 +3480,7 @@ dependencies = [
  "cda-health",
  "cda-interfaces",
  "cda-plugin-communication-management",
+ "cda-plugin-lock-priority",
  "cda-plugin-runtime-update",
  "cda-plugin-security",
  "cda-sovd",
@@ -3663,7 +3675,7 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 [[package]]
 name = "override-macros"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5423,7 +5435,7 @@ dependencies = [
 [[package]]
 name = "sovd-interfaces"
 version = "0.1.0"
-source = "git+https://github.com/eclipse-opensovd/classic-diagnostic-adapter.git?rev=99c60782a6e25f6cff9ba3a3418d0750f936016e#99c60782a6e25f6cff9ba3a3418d0750f936016e"
+source = "git+https://github.com/Eclipse-SDV-Hackathon-Chapter-Four/classic-diagnostic-adapter.git?rev=58f0c9044e2585d5dd264a980935c43d3c921250#58f0c9044e2585d5dd264a980935c43d3c921250"
 dependencies = [
  "cda-interfaces",
  "chrono",

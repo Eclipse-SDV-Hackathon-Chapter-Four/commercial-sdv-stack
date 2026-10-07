@@ -18,4 +18,9 @@ echo "Using DoIpTesterIp: $DOIP_TESTER_IP"
 
 find "." -maxdepth 1 -type f -print0 | xargs -0 sha1sum
 
-/app/opensovd-cda --tester-address "$DOIP_TESTER_IP" "$@"
+# AI-generated (GitHub Copilot, Claude Opus 5.5) - issue 7: begin
+# no access for others to the SOVD Unix socket created by CDA
+umask 0007
+
+exec /app/opensovd-cda --tester-address "$DOIP_TESTER_IP" "$@"
+# AI-generated - issue 7: end
