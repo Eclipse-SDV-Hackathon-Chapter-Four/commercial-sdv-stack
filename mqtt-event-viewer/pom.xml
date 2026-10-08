@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+
+  See the NOTICE file(s) distributed with this work for additional
+  information regarding copyright ownership.
+
+  This program and the accompanying materials are made available under the
+  terms of the Apache License Version 2.0 which is available at
+  https://www.apache.org/licenses/LICENSE-2.0
+
+  SPDX-License-Identifier: Apache-2.0
+
+  Portions of this file were generated with AI assistance (GitHub Copilot).
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.1</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>org.eclipse.sdv.commercial</groupId>
+    <artifactId>mqtt-event-viewer</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <name>MQTT Event Viewer</name>
+    <description>Web UI for watching MQTT messages exchanged via the commercial SDV stack's broker</description>
+
+    <licenses>
+        <license>
+            <name>Apache-2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+    </licenses>
+
+    <properties>
+        <java.version>21</java.version>
+        <paho.mqttv5.version>1.2.5</paho.mqttv5.version>
+        <up-java.version>3.0.0</up-java.version>
+        <!-- not available from Maven Central yet, run install-up-transport-mqtt5.sh first -->
+        <up-transport-mqtt5-java.version>0.1.0-SNAPSHOT</up-transport-mqtt5-java.version>
+        <!-- Netty is only used by the HiveMQ MQTT client (via up-transport-mqtt5-java), which is built against Netty 4.1 -->
+        <netty.version>4.1.126.Final</netty.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.paho</groupId>
+            <artifactId>org.eclipse.paho.mqttv5.client</artifactId>
+            <version>${paho.mqttv5.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.uprotocol</groupId>
+            <artifactId>up-java</artifactId>
+            <version>${up-java.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.uprotocol</groupId>
+            <artifactId>up-transport-mqtt5-java</artifactId>
+            <version>${up-transport-mqtt5-java.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>mqtt-event-viewer</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

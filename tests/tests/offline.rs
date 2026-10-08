@@ -13,8 +13,9 @@
 
 /*
  * AI assistance: parts of this file were generated with Claude Code (Opus 4.8)
- * and reviewed and verified by the human contributor. All content is
- * contributed under the Apache-2.0 license declared above.
+ * and GitHub Copilot (Claude Opus 5.5) and reviewed and verified by the human
+ * contributor. All content is contributed under the Apache-2.0 license declared
+ * above.
  */
 
 //! Stateful attestation & offline tests.
@@ -35,7 +36,6 @@ use std::{
     time::Duration,
 };
 
-use reqwest::Method;
 use sdv_integration_tests::*;
 
 // Serialize the stateful tests regardless of --test-threads.

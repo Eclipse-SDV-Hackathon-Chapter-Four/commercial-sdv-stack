@@ -12,15 +12,16 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # AI assistance: parts of this file were generated with Claude Code (Opus 4.8)
-# and reviewed and verified by the human contributor. All content is
-# contributed under the Apache-2.0 license declared above.
+# and GitHub Copilot (Claude Opus 5.5) and reviewed and verified by the human
+# contributor. All content is contributed under the Apache-2.0 license declared
+# above.
 #
 # Convenience runner for the authorization integration tests.
 #
 #   - If a local `cargo` is available, just runs `cargo test`.
 #   - Otherwise (this environment has no host toolchain) it builds the test
 #     binary inside a Rust container and executes it on the host, where
-#     `docker` and localhost:20002 are reachable.
+#     `docker` is reachable (the CDA is accessed via its Unix socket volume).
 #
 # Extra args are passed through to libtest, e.g.:
 #   ./run.sh --skip expired        # skip the slow ~70s expiry check

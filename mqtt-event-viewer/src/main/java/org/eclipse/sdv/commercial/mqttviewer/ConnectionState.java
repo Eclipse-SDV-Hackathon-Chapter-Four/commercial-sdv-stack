@@ -1,0 +1,32 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+ *
+ * See the NOTICE file(s) distributed with this work for additional
+ * information regarding copyright ownership.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Apache License Version 2.0 which is available at
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Portions of this file were generated with AI assistance (GitHub Copilot).
+ */
+package org.eclipse.sdv.commercial.mqttviewer;
+
+import java.time.Instant;
+import java.util.List;
+
+/** The state of the connection to the MQTT broker. */
+public record ConnectionState(
+        boolean connected,
+        String brokerUri,
+        String clientId,
+        List<String> topics,
+        String lastError,
+        Instant changedAt) {
+
+    public ConnectionState {
+        topics = topics == null ? List.of() : List.copyOf(topics);
+    }
+}

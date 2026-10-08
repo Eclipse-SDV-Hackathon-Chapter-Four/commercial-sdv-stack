@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<!--
+  SPDX-FileCopyrightText: Copyright (c) 2026 Contributors to the Eclipse Foundation
+
+  See the NOTICE file(s) distributed with this work for additional
+  information regarding copyright ownership.
+
+  This program and the accompanying materials are made available under the
+  terms of the Apache License Version 2.0 which is available at
+  https://www.apache.org/licenses/LICENSE-2.0
+
+  SPDX-License-Identifier: Apache-2.0
+
+  Portions of this file were generated with AI assistance (GitHub Copilot).
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>uProtocol Event Viewer</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+    <h1>uProtocol Event Viewer</h1>
+    <div id="connection" class="badge disconnected" title="">connecting…</div>
+    <div class="counters">
+        <span>received <strong id="count-received">0</strong></span>
+        <span>shown <strong id="count-shown">0</strong></span>
+    </div>
+    <div class="controls">
+        <input id="topic-filter" type="search" placeholder="Topic filter (e.g. vehicle/+/# or substring)">
+        <input id="text-filter" type="search" placeholder="Search payload / properties">
+        <button id="pause" type="button">Pause</button>
+        <button id="clear" type="button" title="Clear the buffer for all viewers">Clear</button>
+        <button id="rpc-toggle" type="button" title="Invoke a uProtocol service operation" hidden>Invoke RPC</button>
+    </div>
+</header>
+<form id="rpc" hidden>
+    <span id="rpc-source" class="rpc-source"></span>
+    <input id="rpc-method" required placeholder="Method URI, e.g. up://vehicle/10301/1/1">
+    <input id="rpc-payload" placeholder='JSON payload (optional), e.g. {"mode":"Economy"}'>
+    <input id="rpc-token" type="password" autocomplete="off" placeholder="Access token (optional)">
+    <button type="submit">Send</button>
+    <span id="rpc-result" class="rpc-result"></span>
+</form>
+<main>
+    <aside id="topics">
+        <h2>Topics</h2>
+        <ul id="topic-list"></ul>
+        <div id="tech">
+            <h2>Built with</h2>
+            <ul class="tech-list">
+                <li class="wide"><a href="https://uprotocol.org" target="_blank" rel="noopener"
+                       title="uProtocol: message format, topics and RPC via the MQTT 5 transport"><span class="tech-logo"><img src="logos/uprotocol.png" alt=""></span>uProtocol</a></li>
+                <li><a href="https://mqtt.org" target="_blank" rel="noopener"
+                       title="MQTT 5: messaging protocol between vehicle and backend"><span class="tech-logo"><img src="logos/mqtt.svg" alt=""></span>MQTT 5</a></li>
+                <li><a href="https://mosquitto.org" target="_blank" rel="noopener"
+                       title="Eclipse Mosquitto: MQTT broker"><span class="tech-logo"><img src="logos/mosquitto.svg" alt=""></span>Mosquitto</a></li>
+                <li><a href="https://openjdk.org" target="_blank" rel="noopener"
+                       title="Java 21: viewer backend"><span class="tech-logo"><img src="logos/java.svg" alt=""></span>Java 21</a></li>
+                <li><a href="https://spring.io/projects/spring-boot" target="_blank" rel="noopener"
+                       title="Spring Boot: web server, REST API and Server-Sent Events"><span class="tech-logo"><img src="logos/spring-boot.svg" alt=""></span>Spring Boot</a></li>
+                <li><a href="https://www.docker.com" target="_blank" rel="noopener"
+                       title="Docker: packaged and run as a container via Docker Compose"><span class="tech-logo"><img src="logos/docker.svg" alt=""></span>Docker</a></li>
+            </ul>
+        </div>
+        <div id="partners">
+            <h2>Partners</h2>
+            <div class="partner-list">
+                <a class="tall" href="https://www.cummins.com" target="_blank" rel="noopener" title="Cummins Inc."><img src="logos/cummins.svg" alt="Cummins Inc."></a>
+                <a href="https://www.allisontransmission.com" target="_blank" rel="noopener" title="Allison Transmission"><img src="logos/allison.svg" alt="Allison Transmission"></a>
+                <a href="https://www.vantage-power.com" target="_blank" rel="noopener" title="Vantage Power, an Allison Transmission company"><img src="logos/vantage-power.jpg" alt="Vantage Power, an Allison Transmission company"></a>
+            </div>
+        </div>
+    </aside>
+    <section id="events">
+        <table>
+            <thead>
+            <tr>
+                <th class="col-id">#</th>
+                <th class="col-time">Time</th>
+                <th class="col-topic">Topic</th>
+                <th class="col-flags">QoS / Type</th>
+                <th class="col-size">Size</th>
+                <th class="col-payload">Payload</th>
+            </tr>
+            </thead>
+            <tbody id="event-rows"></tbody>
+        </table>
+        <p id="empty" class="empty">Waiting for messages…</p>
+    </section>
+    <section id="details" hidden>
+        <div class="details-header">
+            <h2 id="details-title"></h2>
+            <button id="details-close" type="button" title="Close">✕</button>
+        </div>
+        <dl id="details-meta"></dl>
+        <h3>Payload <span id="details-format" class="tag"></span></h3>
+        <pre id="details-payload"></pre>
+        <div id="details-base64-block" hidden>
+            <h3>Base64</h3>
+            <pre id="details-base64"></pre>
+        </div>
+        <div id="details-user-props-block" hidden>
+            <h3 id="details-user-props-title">User properties</h3>
+            <table class="props">
+                <tbody id="details-user-props"></tbody>
+            </table>
+        </div>
+    </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
